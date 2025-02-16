@@ -5,18 +5,26 @@ import { IERC20 } from "../dependencies/openzeppelin/contracts/IERC20.sol";
 import { SafeERC20 } from "../dependencies/openzeppelin/contracts/SafeERC20.sol";
 import { ReentrancyGuard } from "../dependencies/openzeppelin/contracts/ReentrancyGuard.sol";
 import { Ownable } from "../dependencies/openzeppelin/contracts/Ownable.sol";
+import { Initializable } from "../dependencies/openzeppelin/proxy/Initializable.sol";
 
 import { CollateralManager } from  "./CollateralManager.sol";
 import { InterestRateModel } from"./InterestRateModel.sol";
 import { PriceOracle } from "../utils/PriceOracle.sol";
 
-contract LendingPool is ReentrancyGuard, Ownable {
+contract LendingPool is ReentrancyGuard, Ownable, Initializable {
   using SafeERC20 for IERC20;
 
   // Accepted collateral assets
   mapping(address => bool) public isCollateral;
   // Accepted lending tokens
   mapping(address => bool) public isLendingToken;
+
+  // Fee structure (39 basis points = 0.39%)
+  uint256 public constant FEE_BPS = 39;
+  uint256 public constant BPS_DIVISOR = 10000;
+  
+  // Treasury for collecting fees
+  address public treasury;
 
   address[] public lendingTokens;
 
@@ -40,16 +48,17 @@ contract LendingPool is ReentrancyGuard, Ownable {
   event Borrow(address indexed user, address indexed token, uint256 amount, uint256 collateralAmount);
   event Repay(address indexed user, address indexed token, uint256 amount);
   event Liquidation(address indexed user, address indexed token, uint256 amount);
+  event LenderDeposit(address indexed lender, address indexed token, uint256 amount);
+  event LenderWithdraw(address indexed lender, address indexed token, uint256 amount);
 
-  constructor(
-    address _collateralManager,
+  function initialize(
     address _interestRateModel,
-    address _priceOracle,
-    address _initialOwner
-  ) Ownable(_initialOwner) {
-    collateralManager = CollateralManager(_collateralManager);
+    address _treasury
+  ) external initializer {
     interestRateModel = InterestRateModel(_interestRateModel);
-    priceOracle = PriceOracle(_priceOracle);
+    priceOracle = new PriceOracle();
+    collateralManager = new CollateralManager(address(priceOracle));
+    treasury = _treasury;
   }
 
   function depositCollateral(address collateral, uint256 amount) external nonReentrant {
@@ -103,7 +112,9 @@ contract LendingPool is ReentrancyGuard, Ownable {
   }
 
   function addCollateralToken(address token) external onlyOwner {
+    require(!isCollateral[token], "Already added");
     isCollateral[token] = true;
+    collateralManager.addCollateralToken(token);
   }
 
   function addLendingToken(address token) external onlyOwner {
@@ -119,5 +130,9 @@ contract LendingPool is ReentrancyGuard, Ownable {
       totalDebt += loans[user][token].amount;
     }
     return totalDebt;
+  }
+
+  function getPriceOracleAddress() external view returns (address) {
+    return address(priceOracle);
   }
 }
