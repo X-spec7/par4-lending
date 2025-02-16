@@ -81,22 +81,6 @@ interface ILendingPool {
   );
 
   /**
-    * @notice Emitted on addLendingToken()
-    * @param newLendingToken The address of the new token added as a lending asset.
-  */
-  event AddLendingToken(
-    address newLendingToken
-  );
-
-  /**
-    * @notice Emitted on addCollateralToken()
-    * @param newCollateralToken The address of the new token added as collateral.
-  */
-  event AddCollateralToken(
-    address newCollateralToken
-  );
-
-  /**
     * @notice Supplies certain amount of underlying asset into the Lending Pool,
     *         leading to a AssetSupplied event.
     * - Currently it is not mint any token to the supplier which must be implemented later.
@@ -162,23 +146,5 @@ interface ILendingPool {
   function liquidate(
     address asset,
     address user
-  ) external;
-
-  /**
-    * @notice Adds a new token to the list of approved lending assets.
-    *         This allows the token to be supplied and borrowed within the protocol.
-    * @param newLendingToken The address of the token to be added as a lending asset.
-  */
-  function addLendingToken(
-    address newLendingToken
-  ) external;
-
-  /**
-    * @notice Adds a new token to the list of approved collateral assets.
-    *         This allows the token to be used as collateral in the protocol.
-    * @param newCollateralToken The address of the token to be added as collateral.
-  */
-  function addCollateralToken(
-    address newCollateralToken
   ) external;
 }

@@ -11,6 +11,7 @@ import { CollateralManager } from  "./CollateralManager.sol";
 import { InterestRateModel } from"./InterestRateModel.sol";
 import { PriceOracle } from "../utils/PriceOracle.sol";
 import { ILendingPool } from "../interfaces/ILendingPool.sol";
+import { LendingPoolStorage } from "./LendingPoolStorage.sol";
 
 /**
   * @title Par4 Lending Pool Contract
@@ -22,46 +23,25 @@ import { ILendingPool } from "../interfaces/ILendingPool.sol";
   *   # borrow
   *   # repay
 */
-contract LendingPool is ILendingPool, ReentrancyGuard, Ownable, Initializable {
+contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownable, Initializable {
   using SafeERC20 for IERC20;
-
-  // Accepted collateral assets
-  mapping(address => bool) public isCollateral;
-  // Accepted lending tokens
-  mapping(address => bool) public isLendingToken;
 
   // Fee structure (39 basis points = 0.39%)
   uint256 public constant FEE_BPS = 39;
   uint256 public constant BPS_DIVISOR = 10000;
-  
-  // Treasury for collecting fees
-  address public treasury;
-
-  address[] public lendingTokens;
 
   // Collateral Manager
   CollateralManager public collateralManager;
   // Interest Rate Model
   InterestRateModel public interestRateModel;
-  // Price Oracle
-  PriceOracle public priceOracle;
-
-  struct Loan {
-    uint256 amount;
-    uint256 collateralAmount;
-    uint256 interestRate;
-    uint256 lastUpdated;
-  }
-
-  mapping(address => mapping(address => Loan)) public loans; // borrower -> token -> Loan data
 
   function initialize(
     address _interestRateModel,
     address _treasury
   ) external initializer {
     interestRateModel = InterestRateModel(_interestRateModel);
-    priceOracle = new PriceOracle();
-    collateralManager = new CollateralManager(address(priceOracle));
+    priceOracle = address(new PriceOracle());
+    collateralManager = new CollateralManager(priceOracle);
     treasury = _treasury;
   }
 
@@ -161,33 +141,6 @@ contract LendingPool is ILendingPool, ReentrancyGuard, Ownable, Initializable {
     delete loans[user][token];
 
     emit CollateralLiquidated(user, token, loanAmount);
-  }
-
-  /// @inheritdoc ILendingPool
-  function addCollateralToken(
-    address token
-  ) external virtual override onlyOwner {
-    require(!isCollateral[token], "Already added");
-    isCollateral[token] = true;
-    collateralManager.addCollateralToken(token);
-  }
-
-  /// @inheritdoc ILendingPool
-  function addLendingToken(
-    address token
-  ) external virtual override onlyOwner {
-    require(!isLendingToken[token], "Already added");
-    isLendingToken[token] = true;
-    lendingTokens.push(token);
-  }
-
-  function getUserTotalDebt(address user) external view returns (uint256) {
-    uint256 totalDebt = 0;
-    for (uint256 i = 0; i < lendingTokens.length; i++) {
-      address token = lendingTokens[i];
-      totalDebt += loans[user][token].amount;
-    }
-    return totalDebt;
   }
 
   function getPriceOracleAddress() external view returns (address) {
