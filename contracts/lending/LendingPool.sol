@@ -10,8 +10,19 @@ import { Initializable } from "../dependencies/openzeppelin/proxy/Initializable.
 import { CollateralManager } from  "./CollateralManager.sol";
 import { InterestRateModel } from"./InterestRateModel.sol";
 import { PriceOracle } from "../utils/PriceOracle.sol";
+import { ILendingPool } from "../interfaces/ILendingPool.sol";
 
-contract LendingPool is ReentrancyGuard, Ownable, Initializable {
+/**
+  * @title Par4 Lending Pool Contract
+  * @notice Main entry to interact with Par4 protocol
+  * - The following actions can be done:
+  *   # supply
+  *   # withdraw
+  *   # deposit collateral
+  *   # borrow
+  *   # repay
+*/
+contract LendingPool is ILendingPool, ReentrancyGuard, Ownable, Initializable {
   using SafeERC20 for IERC20;
 
   // Accepted collateral assets
@@ -44,13 +55,6 @@ contract LendingPool is ReentrancyGuard, Ownable, Initializable {
 
   mapping(address => mapping(address => Loan)) public loans; // borrower -> token -> Loan data
 
-  event Deposit(address indexed user, address indexed token, uint256 amount);
-  event Borrow(address indexed user, address indexed token, uint256 amount, uint256 collateralAmount);
-  event Repay(address indexed user, address indexed token, uint256 amount);
-  event Liquidation(address indexed user, address indexed token, uint256 amount);
-  event LenderDeposit(address indexed lender, address indexed token, uint256 amount);
-  event LenderWithdraw(address indexed lender, address indexed token, uint256 amount);
-
   function initialize(
     address _interestRateModel,
     address _treasury
@@ -61,14 +65,54 @@ contract LendingPool is ReentrancyGuard, Ownable, Initializable {
     treasury = _treasury;
   }
 
-  function depositCollateral(address collateral, uint256 amount) external nonReentrant {
+  /// @inheritdoc ILendingPool
+  function supply(
+    address asset,
+    uint256 amount
+  ) external virtual override nonReentrant {
+    require(isLendingToken[asset], "Invalid lending token");
+
+    // Transfer the asset from the user to the lending pool
+    IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+
+    // Emit event that asset has been supplied
+    emit AssetSupplied(msg.sender, asset, amount);
+  }
+
+  /// @inheritdoc ILendingPool
+  function lenderWithdraw(
+    address asset,
+    uint256 amount
+  ) external virtual override nonReentrant {
+    require(isLendingToken[asset], "Invalid lending token");
+
+    // Check if the user has enough balance to withdraw
+    uint256 lenderBalance = IERC20(asset).balanceOf(address(this));
+    require(lenderBalance >= amount, "Insufficient liquidity in pool");
+
+    // Transfer the specified amount back to the lender
+    IERC20(asset).safeTransfer(msg.sender, amount);
+
+    // Emit event that the asset has been withdrawn by the lender
+    emit AssetWithdrawn(msg.sender, asset, amount);
+  }
+
+  /// @inheritdoc ILendingPool
+  function depositCollateral(
+    address collateral,
+    uint256 amount
+  ) external virtual override nonReentrant {
     require(isCollateral[collateral], "Invalid collateral");
     IERC20(collateral).safeTransferFrom(msg.sender, address(collateralManager), amount);
     collateralManager.deposit(msg.sender, collateral, amount);
-    emit Deposit(msg.sender, collateral, amount);
+    emit CollateralDeposited(msg.sender, collateral, amount);
   }
 
-  function borrow(address token, uint256 amount) external nonReentrant {
+  /// @inheritdoc ILendingPool
+  function borrow(
+    address token,
+    uint256 amount
+  ) external virtual override nonReentrant {
     require(isLendingToken[token], "Invalid lending token");
 
     uint256 maxBorrow = collateralManager.getBorrowLimit(msg.sender);
@@ -83,7 +127,11 @@ contract LendingPool is ReentrancyGuard, Ownable, Initializable {
     emit Borrow(msg.sender, token, amount, collateralManager.getCollateralValue(msg.sender));
   }
 
-  function repay(address token, uint256 amount) external nonReentrant {
+  /// @inheritdoc ILendingPool
+  function repayLoan(
+    address token,
+    uint256 amount
+  ) external virtual override nonReentrant {
     require(isLendingToken[token], "Invalid lending token");
     Loan storage loan = loans[msg.sender][token];
     require(loan.amount > 0, "No active loan");
@@ -96,10 +144,14 @@ contract LendingPool is ReentrancyGuard, Ownable, Initializable {
     IERC20(token).safeTransferFrom(msg.sender, address(this), totalDue);
     delete loans[msg.sender][token];
 
-    emit Repay(msg.sender, token, totalDue);
+    emit LoanRepayed(msg.sender, token, totalDue);
   }
 
-  function liquidate(address user, address token) external nonReentrant {
+  /// @inheritdoc ILendingPool
+  function liquidate(
+    address user,
+    address token
+  ) external virtual override nonReentrant {
     require(isLendingToken[token], "Invalid lending token");
     require(collateralManager.isLiquidatable(user), "Collateral is sufficient");
 
@@ -108,16 +160,22 @@ contract LendingPool is ReentrancyGuard, Ownable, Initializable {
 
     delete loans[user][token];
 
-    emit Liquidation(user, token, loanAmount);
+    emit CollateralLiquidated(user, token, loanAmount);
   }
 
-  function addCollateralToken(address token) external onlyOwner {
+  /// @inheritdoc ILendingPool
+  function addCollateralToken(
+    address token
+  ) external virtual override onlyOwner {
     require(!isCollateral[token], "Already added");
     isCollateral[token] = true;
     collateralManager.addCollateralToken(token);
   }
 
-  function addLendingToken(address token) external onlyOwner {
+  /// @inheritdoc ILendingPool
+  function addLendingToken(
+    address token
+  ) external virtual override onlyOwner {
     require(!isLendingToken[token], "Already added");
     isLendingToken[token] = true;
     lendingTokens.push(token);

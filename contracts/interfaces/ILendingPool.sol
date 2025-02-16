@@ -8,6 +8,30 @@ pragma solidity ^0.8.20;
 
 interface ILendingPool {
   /**
+    * @dev Emitted on supply()
+    * @param lender The address of the lender who is adding liquidity to the pool
+    * @param token The address of the lending asset
+    * @param amount The amount of asset being supplied
+  */
+  event AssetSupplied(
+    address indexed lender,
+    address indexed token,
+    uint256 amount
+  );
+
+  /**
+    * @dev Emitted on lenderWithdraw()
+    * @param lender The address of the lender withdrawing the supply
+    * @param token The address of the lending asset
+    * @param amount The amount for lending asset being withdrawn
+  */
+  event AssetWithdrawn(
+    address indexed lender,
+    address indexed token,
+    uint256 amount
+  );
+  
+  /**
     * @dev Emitted on depositCollateral()
     * @param user The address of the user depositing collateral
     * @param token The address of the deposited collateral asset
@@ -38,7 +62,7 @@ interface ILendingPool {
     * @param token The address of the lending token being repayed
     * @param amount The amount of asset being repayed
   */
-  event LoanRepay(
+  event LoanRepayed(
     address indexed user,
     address indexed token,
     uint256 amount
@@ -52,30 +76,6 @@ interface ILendingPool {
   */
   event CollateralLiquidated(
     address indexed user,
-    address indexed token,
-    uint256 amount
-  );
-
-  /**
-    * @dev Emitted on supply()
-    * @param lender The address of the lender who is adding liquidity to the pool
-    * @param token The address of the lending asset
-    * @param amount The amount of asset being supplied
-  */
-  event Supply(
-    address indexed lender,
-    address indexed token,
-    uint256 amount
-  );
-
-  /**
-    * @dev Emitted on lenderWithdraw()
-    * @param lender The address of the lender withdrawing the supply
-    * @param token The address of the lending asset
-    * @param amount The amount for lending asset being withdrawed
-  */
-  event LenderWithdraw(
-    address indexed lender,
     address indexed token,
     uint256 amount
   );
@@ -98,7 +98,7 @@ interface ILendingPool {
 
   /**
     * @notice Supplies certain amount of underlying asset into the Lending Pool,
-    *         leading to a Supply event.
+    *         leading to a AssetSupplied event.
     * - Currently it is not mint any token to the supplier which must be implemented later.
     * @param asset The address of the asset being supplied
     * @param amount The amount of the asset being supplied
@@ -110,11 +110,11 @@ interface ILendingPool {
 
   /**
     * @notice withdraw the lended token from the pool,
-    *         leading to RenderWithdraw event.
-    * @param asset The address of the asset being withdrawed
-    * @param amount The amount of the asset being withdrawed
+    *         leading to AssetWithdrawn event.
+    * @param asset The address of the asset being withdrawn
+    * @param amount The amount of the asset being withdrawn
   */
-  function renderWithdraw(
+  function lenderWithdraw(
     address asset,
     uint256 amount
   ) external;
@@ -144,7 +144,7 @@ interface ILendingPool {
 
   /**
     * @notice repay the loan,
-    *         leading to RepayLoan event.
+    *         leading to LoanRepayed event.
     * @param asset The address of the lending asset being repayed
     * @param amount The amount of the lending asset being repayed
   */
