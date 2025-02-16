@@ -18,6 +18,18 @@ interface ILendingPool {
     address indexed token,
     uint256 amount
   );
+
+  /**
+    * @dev Emitted on lenderWithdraw()
+    * @param lender The address of the lender withdrawing the supply
+    * @param token The address of the lending asset
+    * @param amount The amount for lending asset being withdrawn
+  */
+  event AssetWithdrawn(
+    address indexed lender,
+    address indexed token,
+    uint256 amount
+  );
   
   /**
     * @dev Emitted on depositCollateral()
@@ -69,18 +81,6 @@ interface ILendingPool {
   );
 
   /**
-    * @dev Emitted on lenderWithdraw()
-    * @param lender The address of the lender withdrawing the supply
-    * @param token The address of the lending asset
-    * @param amount The amount for lending asset being withdrawed
-  */
-  event LenderWithdraw(
-    address indexed lender,
-    address indexed token,
-    uint256 amount
-  );
-
-  /**
     * @notice Emitted on addLendingToken()
     * @param newLendingToken The address of the new token added as a lending asset.
   */
@@ -110,9 +110,9 @@ interface ILendingPool {
 
   /**
     * @notice withdraw the lended token from the pool,
-    *         leading to RenderWithdraw event.
-    * @param asset The address of the asset being withdrawed
-    * @param amount The amount of the asset being withdrawed
+    *         leading to AssetWithdrawn event.
+    * @param asset The address of the asset being withdrawn
+    * @param amount The amount of the asset being withdrawn
   */
   function lenderWithdraw(
     address asset,
