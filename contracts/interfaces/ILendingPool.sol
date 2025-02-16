@@ -38,7 +38,7 @@ interface ILendingPool {
     * @param token The address of the lending token being repayed
     * @param amount The amount of asset being repayed
   */
-  event LoanRepay(
+  event LoanRepayed(
     address indexed user,
     address indexed token,
     uint256 amount
@@ -114,7 +114,7 @@ interface ILendingPool {
     * @param asset The address of the asset being withdrawed
     * @param amount The amount of the asset being withdrawed
   */
-  function renderWithdraw(
+  function lenderWithdraw(
     address asset,
     uint256 amount
   ) external;
@@ -144,7 +144,7 @@ interface ILendingPool {
 
   /**
     * @notice repay the loan,
-    *         leading to RepayLoan event.
+    *         leading to LoanRepayed event.
     * @param asset The address of the lending asset being repayed
     * @param amount The amount of the lending asset being repayed
   */
