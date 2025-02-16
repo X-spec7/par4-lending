@@ -8,6 +8,18 @@ pragma solidity ^0.8.20;
 
 interface ILendingPool {
   /**
+    * @dev Emitted on supply()
+    * @param lender The address of the lender who is adding liquidity to the pool
+    * @param token The address of the lending asset
+    * @param amount The amount of asset being supplied
+  */
+  event AssetSupplied(
+    address indexed lender,
+    address indexed token,
+    uint256 amount
+  );
+  
+  /**
     * @dev Emitted on depositCollateral()
     * @param user The address of the user depositing collateral
     * @param token The address of the deposited collateral asset
@@ -57,18 +69,6 @@ interface ILendingPool {
   );
 
   /**
-    * @dev Emitted on supply()
-    * @param lender The address of the lender who is adding liquidity to the pool
-    * @param token The address of the lending asset
-    * @param amount The amount of asset being supplied
-  */
-  event Supply(
-    address indexed lender,
-    address indexed token,
-    uint256 amount
-  );
-
-  /**
     * @dev Emitted on lenderWithdraw()
     * @param lender The address of the lender withdrawing the supply
     * @param token The address of the lending asset
@@ -98,7 +98,7 @@ interface ILendingPool {
 
   /**
     * @notice Supplies certain amount of underlying asset into the Lending Pool,
-    *         leading to a Supply event.
+    *         leading to a AssetSupplied event.
     * - Currently it is not mint any token to the supplier which must be implemented later.
     * @param asset The address of the asset being supplied
     * @param amount The amount of the asset being supplied
