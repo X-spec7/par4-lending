@@ -4,8 +4,11 @@ pragma solidity ^0.8.20;
 import { PriceOracle } from "../utils/PriceOracle.sol";
 import { LendingPool } from "./LendingPool.sol";
 import { IERC20 } from "../dependencies/openzeppelin/contracts/IERC20.sol";
+import { SafeERC20 } from "../dependencies/openzeppelin/contracts/SafeERC20.sol";
 
 contract CollateralManager {
+  using SafeERC20 for IERC20;
+
   PriceOracle public priceOracle;
   address public lendingPool;
 
@@ -28,6 +31,8 @@ contract CollateralManager {
 
   function deposit(address user, address token, uint256 amount) external onlyLendingPool {
     require(priceOracle.getPrice(token) > 0, "Unsupported collateral");
+    IERC20(token).safeTransferFrom(user, address(this), amount);
+    
     userCollateral[user][token] += amount;
     emit CollateralDeposited(user, token, amount);
   }
@@ -69,5 +74,9 @@ contract CollateralManager {
 
   function getLoanValue(address user) internal view returns (uint256) {
     return LendingPool(lendingPool).getUserTotalDebt(user);
+  }
+
+  function addCollateralToken(address token) external {
+    collateralTokens.push(token);
   }
 }
