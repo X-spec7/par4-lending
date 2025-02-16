@@ -13,7 +13,7 @@ interface ILendingPool {
     * @param token The address of the deposited collateral asset
     * @param amount The amount of supplied collateral asset
   */
-  event DepositCollateral(
+  event CollateralDeposited(
     address indexed user,
     address indexed token,
     uint256 amount
@@ -50,7 +50,7 @@ interface ILendingPool {
     * @param token The address of the collateral token which is being liquidated
     * @param amount The amount of collateral being liquidated
   */
-  event Liquidation(
+  event CollateralLiquidated(
     address indexed user,
     address indexed token,
     uint256 amount
@@ -121,7 +121,7 @@ interface ILendingPool {
 
   /**
     * @notice deposit collateral to the pool,
-    *         leading to DepositCollateral event.
+    *         leading to CollateralDeposited event.
     * @param collateral The address of the collateral asset being depoisted
     * @param amount The amount of the collateral asset being depoisted
   */
@@ -155,7 +155,7 @@ interface ILendingPool {
 
   /**
     * @notice Liquidate the collateral asset when the Loan-to-Value (LTV) ratio 
-    *         exceeds the allowed threshold, leading to a liquidation event.
+    *         exceeds the allowed threshold, leading to a CollateralLiquidated event.
     * @param asset The address of the collateral asset being liquidated
     * @param user The address of the borrower whose collateral is being liquidated
   */
