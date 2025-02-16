@@ -6,10 +6,20 @@ import "../dependencies/chainlink/AggregatorV3Interface.sol";
 
 contract PriceOracle {
   mapping(address => address) public priceFeeds;
+  address public lendingPool;
 
   event PriceFeedUpdated(address indexed token, address indexed feed);
 
-  function setPriceFeed(address token, address feed) external {
+  modifier onlyLendingPool() {
+    require(msg.sender == lendingPool, "Only LendingPool can call this function");
+    _;
+  }
+
+  constructor() {
+    lendingPool = msg.sender; // Price Oracle is deployed by Lending pool
+  }
+
+  function setPriceFeed(address token, address feed) external onlyLendingPool {
     priceFeeds[token] = feed;
     emit PriceFeedUpdated(token, feed);
   }
