@@ -69,16 +69,32 @@ contract LendingPool is ILendingPool, ReentrancyGuard, Ownable, Initializable {
   function supply(
     address asset,
     uint256 amount
-  ) external virtual override {
+  ) external virtual override nonReentrant {
+    require(isLendingToken[asset], "Invalid lending token");
 
+    // Transfer the asset from the user to the lending pool
+    IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+
+    // Emit event that asset has been supplied
+    emit AssetSupplied(msg.sender, asset, amount);
   }
 
   /// @inheritdoc ILendingPool
   function lenderWithdraw(
     address asset,
     uint256 amount
-  ) external virtual override {
+  ) external virtual override nonReentrant {
+    require(isLendingToken[asset], "Invalid lending token");
 
+    // Check if the user has enough balance to withdraw
+    uint256 lenderBalance = IERC20(asset).balanceOf(address(this));
+    require(lenderBalance >= amount, "Insufficient liquidity in pool");
+
+    // Transfer the specified amount back to the lender
+    IERC20(asset).safeTransfer(msg.sender, amount);
+
+    // Emit event that the asset has been withdrawn by the lender
+    emit AssetWithdrawn(msg.sender, asset, amount);
   }
 
   /// @inheritdoc ILendingPool
