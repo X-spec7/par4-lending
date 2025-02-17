@@ -78,4 +78,14 @@ interface ILendingPoolStorage {
     address user
   ) external returns (bool);
 
+  /**
+    * @notice Calculates the utilization rate of a given token in the lending pool.
+    * @dev Utilization rate is calculated as (borrowed amount / total liquidity).
+    * @param token The address of the token for which the utilization rate is being calculated.
+    * @return The utilization rate as a percentage (scaled by a factor, e.g., in basis points or 1e18 format).
+  */
+  function getUtilizationRate(
+      address token
+  ) external returns (uint256);
+
 }
