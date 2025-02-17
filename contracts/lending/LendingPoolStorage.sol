@@ -5,6 +5,7 @@ import { IERC20 } from "../dependencies/openzeppelin/contracts/IERC20.sol";
 
 import { ILendingPoolStorage } from "../interfaces/ILendingPoolStorage.sol";
 import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
+import { Errors } from "../libraries/helpers/Errors.sol";
 /**
   * @title LendingPoolStorage
   * @notice This contract stores the data related to loans, collateral, and lending tokens. 
@@ -47,7 +48,7 @@ contract LendingPoolStorage is ILendingPoolStorage {
 
   /// @inheritdoc ILendingPoolStorage
   function addCollateralToken(address token) external {
-    require(!isCollateral[token], "Already added");
+    require(!isCollateral[token], Errors.COLLATERAL_ALREADY_ADDED);
     isCollateral[token] = true;
     collateralTokens.push(token);
     emit LendingTokenAdded(token);
@@ -55,7 +56,7 @@ contract LendingPoolStorage is ILendingPoolStorage {
 
   /// @inheritdoc ILendingPoolStorage
   function addLendingToken(address token) external {
-    require(!isLendingToken[token], "Already added");
+    require(!isLendingToken[token], Errors.LENDING_TOKEN_ALREADY_ADDED);
     isLendingToken[token] = true;
     lendingTokens.push(token);
     emit CollateralTokenAdded(token);

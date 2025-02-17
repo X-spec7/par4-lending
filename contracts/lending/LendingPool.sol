@@ -12,6 +12,7 @@ import { PriceOracle } from "../utils/PriceOracle.sol";
 import { ILendingPool } from "../interfaces/ILendingPool.sol";
 import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
 import { LendingPoolStorage } from "./LendingPoolStorage.sol";
+import { Errors } from "../libraries/helpers/Errors.sol";
 
 /**
   * @title Par4 Lending Pool Contract
@@ -47,7 +48,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     address asset,
     uint256 amount
   ) external virtual override nonReentrant {
-    require(isLendingToken[asset], "Invalid lending token");
+    require(isLendingToken[asset], Errors.UNSUPPORTED_LENDING_TOKEN);
 
     // Transfer the asset from the user to the lending pool
     IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
@@ -61,11 +62,11 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     address asset,
     uint256 amount
   ) external virtual override nonReentrant {
-    require(isLendingToken[asset], "Invalid lending token");
+    require(isLendingToken[asset], Errors.UNSUPPORTED_LENDING_TOKEN);
 
     // Check if the user has enough balance to withdraw
     uint256 lenderBalance = IERC20(asset).balanceOf(address(this));
-    require(lenderBalance >= amount, "Insufficient liquidity in pool");
+    require(lenderBalance >= amount, Errors.INSUFFICIENT_LENDER_LIQUIDITY);
 
     // Transfer the specified amount back to the lender
     IERC20(asset).safeTransfer(msg.sender, amount);
@@ -79,7 +80,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     address collateral,
     uint256 amount
   ) external virtual override nonReentrant {
-    require(isCollateral[collateral], "Unsupported collateral");
+    require(isCollateral[collateral], Errors.UNSUPPORTED_COLLATERAL);
 
     IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
     userCollateral[msg.sender][collateral] += amount;
@@ -92,7 +93,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     address collateral,
     uint256 amount
   ) external virtual override nonReentrant {
-    require(isCollateral[collateral], "Unsupported collateral");
+    require(isCollateral[collateral], Errors.UNSUPPORTED_COLLATERAL);
     
     IPriceOracle priceOracle = IPriceOracle(priceOracleAddress);
     uint256 remainingValue = getUserCollateralValue(msg.sender) - priceOracle.getPrice(collateral) * amount;
@@ -109,7 +110,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     address token,
     uint256 amount
   ) external virtual override nonReentrant {
-    require(isLendingToken[token], "Unsupported lending token");
+    require(isLendingToken[token], Errors.UNSUPPORTED_LENDING_TOKEN);
 
     uint256 maxBorrow = getBorrowLimit(msg.sender);
     require(amount <= maxBorrow, "Exceeds borrowing limit");
@@ -128,7 +129,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     address token,
     uint256 amount
   ) external virtual override nonReentrant {
-    require(isLendingToken[token], "Invalid lending token");
+    require(isLendingToken[token], Errors.UNSUPPORTED_LENDING_TOKEN);
     Loan storage loan = loans[msg.sender][token];
     require(loan.amount > 0, "No active loan");
 
@@ -147,7 +148,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
   function liquidate(
     address user
   ) external virtual override nonReentrant {
-    require(isLiquidatable(user), "Collateral is insufficient");
+    require(isLiquidatable(user), Errors.NOT_LIQUIDATABLE);
 
     for (uint256 i = 0; i < collateralTokens.length; i++) {
       address collateralToken = collateralTokens[i];
@@ -170,8 +171,8 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     address collateral,
     uint256 amount
   ) internal {
-    require(isCollateral(collateral), "Unsupported collateral")
-    require(isLiquidatable(user), "The LTV does not exceed the threshold.");
+    require(isCollateral(collateral), Errors.UNSUPPORTED_COLLATERAL)
+    require(isLiquidatable(user), Errors.NOT_LIQUIDATABLE);
     
     if (amount == 0) {
       // TODO!: Implement detailed liquidation logic here with the entire collateral balance.
