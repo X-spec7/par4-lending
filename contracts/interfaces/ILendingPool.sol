@@ -43,10 +43,12 @@ interface ILendingPool {
     uint256 amount
   );
 
-  /// @notice Emitted on withdrawCollateral().
-  /// @param user The address of the user who withdrew the collateral.
-  /// @param token The address of the collateral token that was withdrawn.
-  /// @param amount The amount of collateral that was withdrawn.
+  /**
+    * @notice Emitted on withdrawCollateral().
+    * @param user The address of the user who withdrew the collateral.
+    * @param token The address of the collateral token that was withdrawn.
+    * @param amount The amount of collateral that was withdrawn.
+  */
   event CollateralWithdrawn(
     address indexed user,
     address indexed token,
@@ -83,7 +85,7 @@ interface ILendingPool {
     * @param user The address of the user whose collateral is being liquidated
   */
   event EntireCollateralLiquidated(
-    address indexed user,
+    address indexed user
   );
 
   /**
