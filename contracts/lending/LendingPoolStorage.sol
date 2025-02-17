@@ -114,11 +114,13 @@ abstract contract LendingPoolStorage is ILendingPoolStorage {
     address user
   ) public view override returns (uint256) {
     uint256 totalValue = 0;
+
     for (uint256 i = 0; i < collateralTokens.length; i++) {
       address token = collateralTokens[i];
       IPriceOracle priceOracle = IPriceOracle(priceOracleAddress);
       totalValue += priceOracle.getPrice(token) * userCollateral[user][token];
     }
+    
     return totalValue;
   }
 

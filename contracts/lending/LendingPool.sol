@@ -81,8 +81,11 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     uint256 lenderBalance = IERC20(asset).balanceOf(address(this));
     require(lenderBalance >= amount, Errors.INSUFFICIENT_LENDER_LIQUIDITY);
 
-    // Transfer the specified amount back to the lender
-    IERC20(asset).safeTransfer(msg.sender, amount);
+    uint256 fee = amount * FEE_BPS;
+
+    // Transfer the specified amount back to the lender, fee to treasury address
+    IERC20(asset).safeTransfer(msg.sender, amount - fee);
+    IERC20(asset).safeTransfer(treasury, fee);
 
     // Emit event that the asset has been withdrawn by the lender
     emit AssetWithdrawn(msg.sender, asset, amount);
@@ -112,8 +115,11 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     uint256 remainingValue = getUserCollateralValue(msg.sender) - priceOracle.getPrice(collateral) * amount;
     require(remainingValue >= getUserTotalDebt(msg.sender) * 125 / 100, "Collateral below required threshold");
     
+    uint256 fee = amount * FEE_BPS / BPS_DIVISOR;
+    
     userCollateral[msg.sender][collateral] -= amount;
-    IERC20(collateral).transfer(msg.sender, amount); 
+    IERC20(collateral).safeTransfer(msg.sender, amount - fee);
+    IERC20(collateral).safeTransfer(treasury, fee);
 
     emit CollateralWithdrawn(msg.sender, collateral, amount);
   }
@@ -213,7 +219,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     for (uint256 i = 0; i < collateralTokens.length; i++) {
       address collateralToken = collateralTokens[i];
       if (userCollateral[user][collateralToken] != 0) {
-        liquidateCollateral(user, collateralToken, 0);
+        _liquidateCollateral(user, collateralToken, 0);
       }
     }
 
@@ -226,12 +232,14 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     * @param collateral The address of the collateral token to liquidate.
     * @param amount The amount of collateral to liquidate. If set to 0, the entire collateral balance will be liquidated.
   */
-  function liquidateCollateral(
+  function _liquidateCollateral(
     address user,
     address collateral,
     uint256 amount
   ) internal {
     require(isCollateral[collateral], Errors.UNSUPPORTED_COLLATERAL);
+
+    // check if this liquidateCollateral will need to be used independently, thus need this require statement.
     require(isLiquidatable(user), Errors.NOT_LIQUIDATABLE);
     
     if (amount == 0) {
