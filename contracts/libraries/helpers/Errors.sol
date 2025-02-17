@@ -4,37 +4,40 @@ pragma solidity ^0.8.20;
 /**
   * @title Errors Library
   * @notice A centralized library of error messages used across the protocol.
+  * @dev Standardized error messages improve gas efficiency and code readability.
 */
 library Errors {
-  
-  /// @notice Thrown when the caller is not an admin.
-  string public constant CALLER_NOT_ADMIN = "Caller is not admin";
-  
-  /// @notice Thrown when the collateral token has already been added to the system.
+
+  /// @notice Thrown when the caller is not authorized to perform an action.
+  string public constant CALLER_NOT_ADMIN = "Caller is not an admin";
+
+  /// @notice Thrown when attempting to add a collateral token that already exists.
   string public constant COLLATERAL_ALREADY_ADDED = "Collateral already added";
-  
-  /// @notice Thrown when the lending token has already been added to the system.
+
+  /// @notice Thrown when attempting to add a lending token that already exists.
   string public constant LENDING_TOKEN_ALREADY_ADDED = "Lending token already added";
 
-  /// @notice Thrown when an unsupported lending token is used.
-  string public constant UNSUPPORTED_LENDING_TOKEN = "Lending token not supported";
-  
-  /// @notice Thrown when an unsupported collateral token is used.
-  string public constant UNSUPPORTED_COLLATERAL = "Collateral not supported";
-  
-  /// @notice Thrown when there is insufficient liquidity available from the lender.
+  /// @notice Thrown when the provided lending token is not supported by the protocol.
+  string public constant UNSUPPORTED_LENDING_TOKEN = "Unsupported lending token";
+
+  /// @notice Thrown when the provided collateral token is not supported by the protocol.
+  string public constant UNSUPPORTED_COLLATERAL = "Unsupported collateral token";
+
+  /// @notice Thrown when the lender does not have enough liquidity to fulfill a request.
   string public constant INSUFFICIENT_LENDER_LIQUIDITY = "Insufficient lender liquidity";
-  
-  /// @notice Thrown when the borrowing limit is exceeded.
-  string public constant EXCEED_BORROWING_LIMIT = "Exceeds borrowing limit";
-  
-  /// @notice Thrown when there is no active loan to perform the requested operation.
-  string public constant NO_ACTIVE_LOAN = "No active loan";
-  
-  /// @notice Thrown when the position is not eligible for liquidation.
-  string public constant NOT_LIQUIDATABLE = "LTV does not exceed the threshold";
 
-  string public constant INSUFFICIENT_LIQUIDITY = "Insufficient liquidity to borrow";
+  /// @notice Thrown when a borrower tries to borrow more than their limit.
+  string public constant EXCEED_BORROWING_LIMIT = "Borrow amount exceeds limit";
 
-  string public constant INSUFFICIENT_REPAYMENT = "Repayment is insufficient";
+  /// @notice Thrown when a user attempts to perform an operation on a non-existent loan.
+  string public constant NO_ACTIVE_LOAN = "No active loan found";
+
+  /// @notice Thrown when a position is not eligible for liquidation due to LTV not exceeding the threshold.
+  string public constant NOT_LIQUIDATABLE = "Position is not liquidatable (LTV too low)";
+
+  /// @notice Thrown when there is insufficient liquidity available in the pool to fulfill a loan request.
+  string public constant INSUFFICIENT_LIQUIDITY = "Not enough liquidity in the pool";
+
+  /// @notice Thrown when a repayment amount is less than the required due amount.
+  string public constant INSUFFICIENT_REPAYMENT = "Repayment amount is insufficient";
 }
