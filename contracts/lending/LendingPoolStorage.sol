@@ -90,14 +90,14 @@ contract LendingPoolStorage is ILendingPoolStorage {
   /// @inheritdoc ILendingPoolStorage
   function getBorrowLimit(
     address user
-  ) external view override returns (uint256) {
+  ) public view override returns (uint256) {
     return (getUserCollateralValue(user) * 75) / 100; // 75% Loan-to-Value (LTV) ratio
   }
 
   /// @inheritdoc ILendingPoolStorage
   function isLiquidatable(
     address user
-  ) external view override returns (bool) {
+  ) public view override returns (bool) {
     return getUserCollateralValue(user) < getUserTotalDebt(user) * 125 / 100;
   }
 }

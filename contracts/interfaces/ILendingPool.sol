@@ -81,13 +81,9 @@ interface ILendingPool {
   /**
     * @dev Emitted on liquidate()
     * @param user The address of the user whose collateral is being liquidated
-    * @param token The address of the collateral token which is being liquidated
-    * @param amount The amount of collateral being liquidated
   */
-  event CollateralLiquidated(
+  event EntireCollateralLiquidated(
     address indexed user,
-    address indexed token,
-    uint256 amount
   );
 
   /**
@@ -157,13 +153,11 @@ interface ILendingPool {
   ) external;
 
   /**
-    * @notice Liquidate the collateral asset when the Loan-to-Value (LTV) ratio 
-    *         exceeds the allowed threshold, leading to a CollateralLiquidated event.
-    * @param asset The address of the collateral asset being liquidated
+    * @notice Liquidate the whole collateral assets of a user when the Loan-to-Value (LTV) ratio 
+    *         exceeds the allowed threshold, leading to a EntireCollateralLiquidated event.
     * @param user The address of the borrower whose collateral is being liquidated
   */
   function liquidate(
-    address asset,
     address user
   ) external;
 }
