@@ -147,7 +147,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
   function liquidate(
     address user
   ) external virtual override nonReentrant {
-    require(isLiquidatable(user), "Collateral is insufficient");
+    require(isLiquidatable(user), "Collateral is sufficient");
 
     for (uint256 i = 0; i < collateralTokens.length; i++) {
       address collateralToken = collateralTokens[i];
