@@ -5,77 +5,131 @@ import { IERC20 } from "../dependencies/openzeppelin/contracts/IERC20.sol";
 import { SafeERC20 } from "../dependencies/openzeppelin/contracts/SafeERC20.sol";
 import { ReentrancyGuard } from "../dependencies/openzeppelin/contracts/ReentrancyGuard.sol";
 import { Ownable } from "../dependencies/openzeppelin/contracts/Ownable.sol";
+import { Initializable } from "../dependencies/openzeppelin/proxy/Initializable.sol";
 
-import { CollateralManager } from  "./CollateralManager.sol";
 import { InterestRateModel } from"./InterestRateModel.sol";
 import { PriceOracle } from "../utils/PriceOracle.sol";
+import { ILendingPool } from "../interfaces/ILendingPool.sol";
+import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
+import { LendingPoolStorage } from "./LendingPoolStorage.sol";
+import { Errors } from "../libraries/helpers/Errors.sol";
 
-contract LendingPool is ReentrancyGuard, Ownable {
+/**
+  * @title Par4 Lending Pool Contract
+  * @notice Main entry to interact with Par4 protocol
+  * - The following actions can be done:
+  *   # supply
+  *   # withdraw
+  *   # deposit collateral
+  *   # borrow
+  *   # repay
+*/
+contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownable, Initializable {
   using SafeERC20 for IERC20;
 
-  // Accepted collateral assets
-  mapping(address => bool) public isCollateral;
-  // Accepted lending tokens
-  mapping(address => bool) public isLendingToken;
+  // Fee structure (39 basis points = 0.39%)
+  uint256 public constant FEE_BPS = 39;
+  uint256 public constant BPS_DIVISOR = 10000;
 
-  address[] public lendingTokens;
-
-  // Collateral Manager
-  CollateralManager public collateralManager;
   // Interest Rate Model
   InterestRateModel public interestRateModel;
-  // Price Oracle
-  PriceOracle public priceOracle;
 
-  struct Loan {
-    uint256 amount;
-    uint256 collateralAmount;
-    uint256 interestRate;
-    uint256 lastUpdated;
-  }
-
-  mapping(address => mapping(address => Loan)) public loans; // borrower -> token -> Loan data
-
-  event Deposit(address indexed user, address indexed token, uint256 amount);
-  event Borrow(address indexed user, address indexed token, uint256 amount, uint256 collateralAmount);
-  event Repay(address indexed user, address indexed token, uint256 amount);
-  event Liquidation(address indexed user, address indexed token, uint256 amount);
-
-  constructor(
-    address _collateralManager,
+  function initialize(
     address _interestRateModel,
-    address _priceOracle,
-    address _initialOwner
-  ) Ownable(_initialOwner) {
-    collateralManager = CollateralManager(_collateralManager);
+    address _treasury
+  ) external initializer {
     interestRateModel = InterestRateModel(_interestRateModel);
-    priceOracle = PriceOracle(_priceOracle);
+    priceOracleAddress = address(new PriceOracle());
+    treasury = _treasury;
   }
 
-  function depositCollateral(address collateral, uint256 amount) external nonReentrant {
-    require(isCollateral[collateral], "Invalid collateral");
-    IERC20(collateral).safeTransferFrom(msg.sender, address(collateralManager), amount);
-    collateralManager.deposit(msg.sender, collateral, amount);
-    emit Deposit(msg.sender, collateral, amount);
+  /// @inheritdoc ILendingPool
+  function supply(
+    address asset,
+    uint256 amount
+  ) external virtual override nonReentrant {
+    require(isLendingToken[asset], Errors.UNSUPPORTED_LENDING_TOKEN);
+
+    // Transfer the asset from the user to the lending pool
+    IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+
+    // Emit event that asset has been supplied
+    emit AssetSupplied(msg.sender, asset, amount);
   }
 
-  function borrow(address token, uint256 amount) external nonReentrant {
-    require(isLendingToken[token], "Invalid lending token");
+  /// @inheritdoc ILendingPool
+  function lenderWithdraw(
+    address asset,
+    uint256 amount
+  ) external virtual override nonReentrant {
+    require(isLendingToken[asset], Errors.UNSUPPORTED_LENDING_TOKEN);
 
-    uint256 maxBorrow = collateralManager.getBorrowLimit(msg.sender);
+    // Check if the user has enough balance to withdraw
+    uint256 lenderBalance = IERC20(asset).balanceOf(address(this));
+    require(lenderBalance >= amount, Errors.INSUFFICIENT_LENDER_LIQUIDITY);
+
+    // Transfer the specified amount back to the lender
+    IERC20(asset).safeTransfer(msg.sender, amount);
+
+    // Emit event that the asset has been withdrawn by the lender
+    emit AssetWithdrawn(msg.sender, asset, amount);
+  }
+
+  /// @inheritdoc ILendingPool
+  function depositCollateral(
+    address collateral,
+    uint256 amount
+  ) external virtual override nonReentrant {
+    require(isCollateral[collateral], Errors.UNSUPPORTED_COLLATERAL);
+
+    IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
+    userCollateral[msg.sender][collateral] += amount;
+
+    emit CollateralDeposited(msg.sender, collateral, amount);
+  }
+
+  /// @inheritdoc ILendingPool
+  function withdrawCollateral(
+    address collateral,
+    uint256 amount
+  ) external virtual override nonReentrant {
+    require(isCollateral[collateral], Errors.UNSUPPORTED_COLLATERAL);
+    
+    IPriceOracle priceOracle = IPriceOracle(priceOracleAddress);
+    uint256 remainingValue = getUserCollateralValue(msg.sender) - priceOracle.getPrice(collateral) * amount;
+    require(remainingValue >= getUserTotalDebt(msg.sender) * 125 / 100, "Collateral below required threshold");
+    
+    userCollateral[msg.sender][collateral] -= amount;
+    IERC20(collateral).transfer(msg.sender, amount); 
+
+    emit CollateralWithdrawn(msg.sender, collateral, amount);
+  }
+
+  /// @inheritdoc ILendingPool
+  function borrow(
+    address token,
+    uint256 amount
+  ) external virtual override nonReentrant {
+    require(isLendingToken[token], Errors.UNSUPPORTED_LENDING_TOKEN);
+
+    uint256 maxBorrow = getBorrowLimit(msg.sender);
     require(amount <= maxBorrow, "Exceeds borrowing limit");
 
     uint256 totalLiquidity = IERC20(token).balanceOf(address(this));
 
     uint256 interestRate = interestRateModel.calculateInterestRate(token, amount, totalLiquidity);
-    loans[msg.sender][token] = Loan(amount, collateralManager.getCollateralValue(msg.sender), interestRate, block.timestamp);
+    loans[msg.sender][token] = Loan(amount, getUserCollateralValue(msg.sender), interestRate, block.timestamp);
 
     IERC20(token).safeTransfer(msg.sender, amount);
-    emit Borrow(msg.sender, token, amount, collateralManager.getCollateralValue(msg.sender));
+    emit Borrow(msg.sender, token, amount, getUserCollateralValue(msg.sender));
   }
 
-  function repay(address token, uint256 amount) external nonReentrant {
-    require(isLendingToken[token], "Invalid lending token");
+  /// @inheritdoc ILendingPool
+  function repayLoan(
+    address token,
+    uint256 amount
+  ) external virtual override nonReentrant {
+    require(isLendingToken[token], Errors.UNSUPPORTED_LENDING_TOKEN);
     Loan storage loan = loans[msg.sender][token];
     require(loan.amount > 0, "No active loan");
 
@@ -87,37 +141,49 @@ contract LendingPool is ReentrancyGuard, Ownable {
     IERC20(token).safeTransferFrom(msg.sender, address(this), totalDue);
     delete loans[msg.sender][token];
 
-    emit Repay(msg.sender, token, totalDue);
+    emit LoanRepayed(msg.sender, token, totalDue);
   }
 
-  function liquidate(address user, address token) external nonReentrant {
-    require(isLendingToken[token], "Invalid lending token");
-    require(collateralManager.isLiquidatable(user), "Collateral is sufficient");
+  /// @inheritdoc ILendingPool
+  function liquidate(
+    address user
+  ) external virtual override nonReentrant {
+    require(isLiquidatable(user), Errors.NOT_LIQUIDATABLE);
 
-    uint256 loanAmount = loans[user][token].amount;
-    collateralManager.liquidate(user, token, loanAmount);
-
-    delete loans[user][token];
-
-    emit Liquidation(user, token, loanAmount);
-  }
-
-  function addCollateralToken(address token) external onlyOwner {
-    isCollateral[token] = true;
-  }
-
-  function addLendingToken(address token) external onlyOwner {
-    require(!isLendingToken[token], "Already added");
-    isLendingToken[token] = true;
-    lendingTokens.push(token);
-  }
-
-  function getUserTotalDebt(address user) external view returns (uint256) {
-    uint256 totalDebt = 0;
-    for (uint256 i = 0; i < lendingTokens.length; i++) {
-      address token = lendingTokens[i];
-      totalDebt += loans[user][token].amount;
+    for (uint256 i = 0; i < collateralTokens.length; i++) {
+      address collateralToken = collateralTokens[i];
+      if (userCollateral[user][collateralToken] != 0) {
+        liquidateCollateral(user, collateralToken, 0);
+      }
     }
-    return totalDebt;
+
+    emit EntireCollateralLiquidated(user);
+  }
+
+  /**
+    * @dev Liquidates a specified amount of a user's collateral.
+    * @param user The address of the user whose collateral will be liquidated.
+    * @param collateral The address of the collateral token to liquidate.
+    * @param amount The amount of collateral to liquidate. If set to 0, the entire collateral balance will be liquidated.
+  */
+  function liquidateCollateral(
+    address user,
+    address collateral,
+    uint256 amount
+  ) internal {
+    require(isCollateral(collateral), Errors.UNSUPPORTED_COLLATERAL)
+    require(isLiquidatable(user), Errors.NOT_LIQUIDATABLE);
+    
+    if (amount == 0) {
+      // TODO!: Implement detailed liquidation logic here with the entire collateral balance.
+      userCollateral[user][collateral] = 0;
+    } else {
+      // TODO!: Implement detailed liquidation logic here with the amount of the collateral
+      userCollateral[user][collateral] -= amount;
+    }
+  }
+
+  function getPriceOracleAddress() external view returns (address) {
+    return address(priceOracleAddress);
   }
 }
