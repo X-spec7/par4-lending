@@ -43,6 +43,16 @@ interface ILendingPool {
     uint256 amount
   );
 
+  /// @notice Emitted on withdrawCollateral().
+  /// @param user The address of the user who withdrew the collateral.
+  /// @param token The address of the collateral token that was withdrawn.
+  /// @param amount The amount of collateral that was withdrawn.
+  event CollateralWithdrawn(
+    address indexed user,
+    address indexed token,
+    uint256 amount
+  );
+
   /**
     * @dev Emitted on borrow()
     * @param user The address of the borrower
@@ -71,29 +81,9 @@ interface ILendingPool {
   /**
     * @dev Emitted on liquidate()
     * @param user The address of the user whose collateral is being liquidated
-    * @param token The address of the collateral token which is being liquidated
-    * @param amount The amount of collateral being liquidated
   */
-  event CollateralLiquidated(
+  event EntireCollateralLiquidated(
     address indexed user,
-    address indexed token,
-    uint256 amount
-  );
-
-  /**
-    * @notice Emitted on addLendingToken()
-    * @param newLendingToken The address of the new token added as a lending asset.
-  */
-  event AddLendingToken(
-    address newLendingToken
-  );
-
-  /**
-    * @notice Emitted on addCollateralToken()
-    * @param newCollateralToken The address of the new token added as collateral.
-  */
-  event AddCollateralToken(
-    address newCollateralToken
   );
 
   /**
@@ -130,6 +120,15 @@ interface ILendingPool {
     uint256 amount
   ) external;
 
+  /// @notice Withdraws a specified amount of collateral from the protocol.
+  /// @dev This function allows a user to remove collateral that they've supplied.
+  /// @param collateral The address of the collateral token to withdraw.
+  /// @param amount The amount of collateral to be withdrawn.
+  function withdrawCollateral(
+      address collateral,
+      uint256 amount
+  ) external;
+
   /**
     * @notice borrow lending token,
     *         leading to Borrow event
@@ -154,31 +153,11 @@ interface ILendingPool {
   ) external;
 
   /**
-    * @notice Liquidate the collateral asset when the Loan-to-Value (LTV) ratio 
-    *         exceeds the allowed threshold, leading to a CollateralLiquidated event.
-    * @param asset The address of the collateral asset being liquidated
+    * @notice Liquidate the whole collateral assets of a user when the Loan-to-Value (LTV) ratio 
+    *         exceeds the allowed threshold, leading to a EntireCollateralLiquidated event.
     * @param user The address of the borrower whose collateral is being liquidated
   */
   function liquidate(
-    address asset,
     address user
-  ) external;
-
-  /**
-    * @notice Adds a new token to the list of approved lending assets.
-    *         This allows the token to be supplied and borrowed within the protocol.
-    * @param newLendingToken The address of the token to be added as a lending asset.
-  */
-  function addLendingToken(
-    address newLendingToken
-  ) external;
-
-  /**
-    * @notice Adds a new token to the list of approved collateral assets.
-    *         This allows the token to be used as collateral in the protocol.
-    * @param newCollateralToken The address of the token to be added as collateral.
-  */
-  function addCollateralToken(
-    address newCollateralToken
   ) external;
 }
