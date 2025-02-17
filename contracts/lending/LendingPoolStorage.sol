@@ -6,6 +6,7 @@ import { IERC20 } from "../dependencies/openzeppelin/contracts/IERC20.sol";
 import { ILendingPoolStorage } from "../interfaces/ILendingPoolStorage.sol";
 import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
 import { Errors } from "../libraries/helpers/Errors.sol";
+
 /**
   * @title LendingPoolStorage
   * @notice This contract stores the data related to loans, collateral, and lending tokens. 
@@ -20,6 +21,7 @@ contract LendingPoolStorage is ILendingPoolStorage {
     * @param interestRate The interest rate applied to the loan
     * @param lastUpdated The timestamp of the last update to the loan
   */
+
   struct Loan {
     uint256 amount;
     uint256 collateralAmount;
@@ -42,9 +44,12 @@ contract LendingPoolStorage is ILendingPoolStorage {
   address[] public lendingTokens;
   address[] public collateralTokens;
 
-  // Mappings to store user-specific loan and collateral data
+  // TODO!: implement debt token for borrowing instead of storing in a map
   mapping(address => mapping(address => Loan)) public loans; // borrower -> token -> Loan data
+
+  // TODO!: implement pToken for adding liquidity instead of storing in map
   mapping(address => mapping(address => uint256)) public userCollateral; // user -> token -> amount
+  mapping(address => mapping(address => uint256)) public userLiquidity; // user -> token -> amount
 
   /// @inheritdoc ILendingPoolStorage
   function addCollateralToken(address token) external {
