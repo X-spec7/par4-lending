@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import { IERC20 } from "../dependencies/openzeppelin/contracts/IERC20.sol";
-
 import { ILendingPoolStorage } from "../interfaces/ILendingPoolStorage.sol";
 import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
 import { Errors } from "../libraries/helpers/Errors.sol";
@@ -37,11 +36,13 @@ abstract contract LendingPoolStorage is ILendingPoolStorage {
   address[] public lendingTokens;
   address[] public collateralTokens;
 
+
   // TODO!: implement debt token for borrowing instead of storing in a map
   mapping(address => DataTypes.Loan[]) public loans; // borrower -> Loan data
 
   // TODO!: implement pToken for adding liquidity instead of storing in map
   mapping(address => DataTypes.LendingPosition) public userLendingPosition; // user -> LendingPosition
+
   mapping(address => mapping(address => uint256)) public userCollateral; // user -> token -> amount
 
   mapping(address => DataTypes.PoolTokenState) public poolTokenStates; // token -> PoolTokenState
