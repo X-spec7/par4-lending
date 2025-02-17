@@ -21,6 +21,8 @@ abstract contract LendingPoolStorage is ILendingPoolStorage {
     uint256 price;  // The USD price of the token
   }
 
+  uint256 loanId = 0;
+
   // The address of the LendingPool contract
   address public lendingPool;
   // The address of the treasury where collected fees are stored
@@ -36,12 +38,11 @@ abstract contract LendingPoolStorage is ILendingPoolStorage {
   address[] public lendingTokens;
   address[] public collateralTokens;
 
-
   // TODO!: implement debt token for borrowing instead of storing in a map
   mapping(address => DataTypes.Loan[]) public loans; // borrower -> Loan data
 
   // TODO!: implement pToken for adding liquidity instead of storing in map
-  mapping(address => DataTypes.LendingPosition) public userLendingPosition; // user -> LendingPosition
+  mapping(address => DataTypes.LendingPosition) public userLendingPositions; // user -> LendingPosition
 
   mapping(address => mapping(address => uint256)) public userCollateral; // user -> token -> amount
 
@@ -141,7 +142,7 @@ abstract contract LendingPoolStorage is ILendingPoolStorage {
   ) public view override returns (uint256) {
     DataTypes.PoolTokenState storage tokenState = poolTokenStates[token];
 
-    uint256 utilizationRate = tokenState.availableLiquidity / (tokenState.totalDeposited + tokenState.availableLiquidity);
+    uint256 utilizationRate = (tokenState.grossLiquidity - tokenState.availableLiquidity) / tokenState.grossLiquidity;
 
     return utilizationRate;
   }

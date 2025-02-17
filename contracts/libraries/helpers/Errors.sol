@@ -33,4 +33,8 @@ library Errors {
   
   /// @notice Thrown when the position is not eligible for liquidation.
   string public constant NOT_LIQUIDATABLE = "LTV does not exceed the threshold";
+
+  string public constant INSUFFICIENT_LIQUIDITY = "Insufficient liquidity to borrow";
+
+  string public constant INSUFFICIENT_REPAYMENT = "Repayment is insufficient";
 }

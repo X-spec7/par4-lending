@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import { DataTypes } from "../libraries/types/DataTypes.sol";
+
 /**
   * @title ILendingPool
   * @notice Defines the interface for Lending Pool of Par4 protocol.
@@ -59,25 +61,26 @@ interface ILendingPool {
     * @dev Emitted on borrow()
     * @param user The address of the borrower
     * @param token The address of the token being borrowed
-    * @param collateralAmount The amount of collateral value of the user
   */
   event Borrow(
     address indexed user,
     address indexed token,
     uint256 amount,
-    uint256 collateralAmount
+    DataTypes.LoanTerm term
   );
 
   /**
     * @dev Emitted on repayLoan()
     * @param user The address of the user who is repaying loan
     * @param token The address of the lending token being repayed
-    * @param amount The amount of asset being repayed
+    * @param totalDue The amount of asset being repayed
+    * @param loanId The id of the loan repayed
   */
   event LoanRepayed(
     address indexed user,
     address indexed token,
-    uint256 amount
+    uint256 totalDue,
+    uint256 loanId
   );
 
   /**
@@ -137,20 +140,22 @@ interface ILendingPool {
     * - Currently it doesn't mint any Loan token, which must be included later.
     * @param asset The address of the asset being borrowed
     * @param amount The amount of the asset being borrowed
+    * @param selectedLoanTerm The loan term selected by the borrower
   */
   function borrow(
     address asset,
-    uint256 amount
+    uint256 amount,
+    DataTypes.LoanTerm selectedLoanTerm
   ) external;
 
   /**
     * @notice repay the loan,
     *         leading to LoanRepayed event.
-    * @param asset The address of the lending asset being repayed
+    * @param loanId The id of the loan being repayed
     * @param amount The amount of the lending asset being repayed
   */
   function repayLoan(
-    address asset,
+    uint256 loanId,
     uint256 amount
   ) external;
 

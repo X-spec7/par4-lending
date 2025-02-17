@@ -11,6 +11,7 @@ library DataTypes {
   }
 
   struct Loan {
+    uint256 loanId;                       // Unique id for Loan
     address borrower;                     // Address of the borrower
     address principalToken;               // The token in which the loan is denominated
     uint256 principalAmount;              // The initial borrowed amount
@@ -31,7 +32,7 @@ library DataTypes {
 
   struct PoolTokenState {
     address token;                // The lending token address
-    uint256 totalDeposited;       // Total amount of tokens deposited into the pool
+    uint256 grossLiquidity;       // Total amount of tokens deposited into the pool
     uint256 availableLiquidity;   // Amount available for new loans (after deducting outstanding loans)
   }
 }
