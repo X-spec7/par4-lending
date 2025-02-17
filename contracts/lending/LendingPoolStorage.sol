@@ -6,6 +6,7 @@ import { IERC20 } from "../dependencies/openzeppelin/contracts/IERC20.sol";
 import { ILendingPoolStorage } from "../interfaces/ILendingPoolStorage.sol";
 import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
 import { Errors } from "../libraries/helpers/Errors.sol";
+import { DataTypes } from "../libraries/types/DataTypes.sol";
 
 /**
   * @title LendingPoolStorage
@@ -45,11 +46,11 @@ contract LendingPoolStorage is ILendingPoolStorage {
   address[] public collateralTokens;
 
   // TODO!: implement debt token for borrowing instead of storing in a map
-  mapping(address => mapping(address => Loan)) public loans; // borrower -> token -> Loan data
+  mapping(address => DataTypes.Loan) public loans; // borrower -> token -> Loan data
 
   // TODO!: implement pToken for adding liquidity instead of storing in map
+  mapping(address => DataTypes.LendingPosition) public userLiquidity; // user -> token -> amount
   mapping(address => mapping(address => uint256)) public userCollateral; // user -> token -> amount
-  mapping(address => mapping(address => uint256)) public userLiquidity; // user -> token -> amount
 
   /// @inheritdoc ILendingPoolStorage
   function addCollateralToken(address token) external {
@@ -68,15 +69,12 @@ contract LendingPoolStorage is ILendingPoolStorage {
   }
 
   /// @inheritdoc ILendingPoolStorage
+  // TODO: implement function body
   function getUserTotalDebt(
     address user
   ) public view override returns (uint256) {
     uint256 totalDebt = 0;
-    // Iterate through all lending tokens and sum the user's loan amounts
-    for (uint256 i = 0; i < lendingTokens.length; i++) {
-      address token = lendingTokens[i];
-      totalDebt += loans[user][token].amount;
-    }
+
     return totalDebt;
   }
 
