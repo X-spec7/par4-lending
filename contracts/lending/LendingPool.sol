@@ -171,7 +171,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     address collateral,
     uint256 amount
   ) internal {
-    require(isCollateral(collateral), Errors.UNSUPPORTED_COLLATERAL)
+    require(isCollateral[collateral], Errors.UNSUPPORTED_COLLATERAL);
     require(isLiquidatable(user), Errors.NOT_LIQUIDATABLE);
     
     if (amount == 0) {
