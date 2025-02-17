@@ -6,13 +6,14 @@ import { SafeERC20 } from "../dependencies/openzeppelin/contracts/SafeERC20.sol"
 import { ReentrancyGuard } from "../dependencies/openzeppelin/contracts/ReentrancyGuard.sol";
 import { Ownable } from "../dependencies/openzeppelin/contracts/Ownable.sol";
 import { Initializable } from "../dependencies/openzeppelin/proxy/Initializable.sol";
-
-import { InterestRateModel } from"./InterestRateModel.sol";
 import { PriceOracle } from "../utils/PriceOracle.sol";
 import { ILendingPool } from "../interfaces/ILendingPool.sol";
 import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
 import { LendingPoolStorage } from "./LendingPoolStorage.sol";
 import { Errors } from "../libraries/helpers/Errors.sol";
+import { DataTypes } from "../libraries/types/DataTypes.sol";
+import { Helper } from "../libraries/helpers/Helper.sol";
+import { InterestCalculator } from "../libraries/helpers/InterestCalculator.sol";
 
 /**
   * @title Par4 Lending Pool Contract
@@ -26,19 +27,16 @@ import { Errors } from "../libraries/helpers/Errors.sol";
 */
 contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownable, Initializable {
   using SafeERC20 for IERC20;
+  using InterestCalculator for DataTypes.Loan;
 
   // Fee structure (39 basis points = 0.39%)
-  uint256 public constant FEE_BPS = 39;
-  uint256 public constant BPS_DIVISOR = 10000;
-
-  // Interest Rate Model
-  InterestRateModel public interestRateModel;
+  uint16 public constant FEE_BPS = 39;
+  uint16 public constant CASHBACK_BPS = 1500;
+  uint16 public constant BPS_DIVISOR = 10000;
 
   function initialize(
-    address _interestRateModel,
     address _treasury
   ) external initializer {
-    interestRateModel = InterestRateModel(_interestRateModel);
     priceOracleAddress = address(new PriceOracle());
     treasury = _treasury;
   }
@@ -52,6 +50,21 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
 
     // Transfer the asset from the user to the lending pool
     IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+
+    // Update pool token state
+    DataTypes.PoolTokenState storage tokenState = poolTokenStates[asset];
+    tokenState.grossLiquidity += amount;
+    tokenState.availableLiquidity += amount;
+    
+    // Update user lending position
+    DataTypes.LendingPosition storage position = userLendingPositions[msg.sender];
+    if (position.amount == 0) {
+      position.lender = msg.sender;
+      position.lendingToken = asset;
+      position.depositTimestamp = block.timestamp;
+    }
+    position.amount += amount;
+    position.lastActionTimestamp = block.timestamp;
 
     // Emit event that asset has been supplied
     emit AssetSupplied(msg.sender, asset, amount);
@@ -68,8 +81,11 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     uint256 lenderBalance = IERC20(asset).balanceOf(address(this));
     require(lenderBalance >= amount, Errors.INSUFFICIENT_LENDER_LIQUIDITY);
 
-    // Transfer the specified amount back to the lender
-    IERC20(asset).safeTransfer(msg.sender, amount);
+    uint256 fee = amount * FEE_BPS;
+
+    // Transfer the specified amount back to the lender, fee to treasury address
+    IERC20(asset).safeTransfer(msg.sender, amount - fee);
+    IERC20(asset).safeTransfer(treasury, fee);
 
     // Emit event that the asset has been withdrawn by the lender
     emit AssetWithdrawn(msg.sender, asset, amount);
@@ -99,8 +115,11 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     uint256 remainingValue = getUserCollateralValue(msg.sender) - priceOracle.getPrice(collateral) * amount;
     require(remainingValue >= getUserTotalDebt(msg.sender) * 125 / 100, "Collateral below required threshold");
     
+    uint256 fee = amount * FEE_BPS / BPS_DIVISOR;
+    
     userCollateral[msg.sender][collateral] -= amount;
-    IERC20(collateral).transfer(msg.sender, amount); 
+    IERC20(collateral).safeTransfer(msg.sender, amount - fee);
+    IERC20(collateral).safeTransfer(treasury, fee);
 
     emit CollateralWithdrawn(msg.sender, collateral, amount);
   }
@@ -108,40 +127,87 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
   /// @inheritdoc ILendingPool
   function borrow(
     address token,
-    uint256 amount
+    uint256 amount,
+    DataTypes.LoanTerm selectedTerm
   ) external virtual override nonReentrant {
     require(isLendingToken[token], Errors.UNSUPPORTED_LENDING_TOKEN);
 
     uint256 maxBorrow = getBorrowLimit(msg.sender);
-    require(amount <= maxBorrow, "Exceeds borrowing limit");
+    require(amount <= maxBorrow, Errors.EXCEED_BORROWING_LIMIT);
 
-    uint256 totalLiquidity = IERC20(token).balanceOf(address(this));
+    DataTypes.PoolTokenState storage tokenState = poolTokenStates[token];
+    require(amount <= tokenState.availableLiquidity, Errors.INSUFFICIENT_LIQUIDITY);
 
-    uint256 interestRate = interestRateModel.calculateInterestRate(token, amount, totalLiquidity);
-    loans[msg.sender][token] = Loan(amount, getUserCollateralValue(msg.sender), interestRate, block.timestamp);
+    // Update pool state
+    tokenState.availableLiquidity -= amount;
+
+    // Record the loan
+    loans[msg.sender].push(DataTypes.Loan({
+      loanId: loanId,
+      borrower: msg.sender,
+      principalToken: token,
+      principalAmount: amount,
+      term: selectedTerm,
+      remainingPayments: Helper.calculatePayments(selectedTerm),
+      startTimestamp: block.timestamp,
+      lastPaymentTimestamp: block.timestamp
+    }));
 
     IERC20(token).safeTransfer(msg.sender, amount);
-    emit Borrow(msg.sender, token, amount, getUserCollateralValue(msg.sender));
+
+    loanId++;
+    emit Borrow(msg.sender, token, amount, selectedTerm);
   }
 
   /// @inheritdoc ILendingPool
   function repayLoan(
-    address token,
+    uint256 loanId,
     uint256 amount
   ) external virtual override nonReentrant {
-    require(isLendingToken[token], Errors.UNSUPPORTED_LENDING_TOKEN);
-    Loan storage loan = loans[msg.sender][token];
-    require(loan.amount > 0, "No active loan");
+    DataTypes.Loan[] storage userLoans = loans[msg.sender];
+    bool loanFound = false;
+    uint256 totalDue = 0;
+    uint256 netInterest = 0;
+    uint256 pureInterest = 0;
+    uint256 cashback = 0;
+    uint256 loanIndex = 0;
+    
+    for (uint256 i = 0; i < userLoans.length; i++) {
+      if (userLoans[i].loanId == loanId) {  // ✅ Find loan by loanId
+        loanFound = true;
+        loanIndex = i;
 
-    uint256 interest = ((block.timestamp - loan.lastUpdated) * loan.amount * loan.interestRate) / (365 days * 100);
-    uint256 totalDue = loan.amount + interest;
+        address token = userLoans[i].principalToken;
 
-    require(amount >= totalDue, "Insufficient repayment");
+        // Calculate interest accrued since last payment
+        DataTypes.Loan storage selectedLoan = userLoans[i];
 
-    IERC20(token).safeTransferFrom(msg.sender, address(this), totalDue);
-    delete loans[msg.sender][token];
+        netInterest = selectedLoan.calculateAccruedInterest(getUtilizationRate(selectedLoan.principalToken));
+        cashback = netInterest * CASHBACK_BPS / BPS_DIVISOR;
+        pureInterest = netInterest - cashback;
 
-    emit LoanRepayed(msg.sender, token, totalDue);
+        totalDue = selectedLoan.principalAmount + netInterest;
+
+        require(amount >= totalDue, Errors.INSUFFICIENT_REPAYMENT);
+
+        // Transfer repayment from user to contract
+        IERC20(token).safeTransferFrom(msg.sender, address(this), selectedLoan.principalAmount);
+        IERC20(token).safeTransferFrom(msg.sender, treasury, pureInterest);
+
+        // Update pool state
+        DataTypes.PoolTokenState storage tokenState = poolTokenStates[token];
+        tokenState.availableLiquidity += selectedLoan.principalAmount;
+
+        // Remove the loan
+        userLoans[loanIndex] = userLoans[userLoans.length - 1]; // Swap with last element
+        userLoans.pop(); // Remove last element
+
+        emit LoanRepayed(msg.sender, token, totalDue, loanId); // Emit loanId
+        break;
+      }
+    }
+
+    require(loanFound, Errors.NO_ACTIVE_LOAN);
   }
 
   /// @inheritdoc ILendingPool
@@ -153,7 +219,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     for (uint256 i = 0; i < collateralTokens.length; i++) {
       address collateralToken = collateralTokens[i];
       if (userCollateral[user][collateralToken] != 0) {
-        liquidateCollateral(user, collateralToken, 0);
+        _liquidateCollateral(user, collateralToken, 0);
       }
     }
 
@@ -166,12 +232,14 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     * @param collateral The address of the collateral token to liquidate.
     * @param amount The amount of collateral to liquidate. If set to 0, the entire collateral balance will be liquidated.
   */
-  function liquidateCollateral(
+  function _liquidateCollateral(
     address user,
     address collateral,
     uint256 amount
   ) internal {
-    require(isCollateral(collateral), Errors.UNSUPPORTED_COLLATERAL)
+    require(isCollateral[collateral], Errors.UNSUPPORTED_COLLATERAL);
+
+    // check if this liquidateCollateral will need to be used independently, thus need this require statement.
     require(isLiquidatable(user), Errors.NOT_LIQUIDATABLE);
     
     if (amount == 0) {

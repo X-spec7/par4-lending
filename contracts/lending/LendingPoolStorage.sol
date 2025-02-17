@@ -2,30 +2,26 @@
 pragma solidity ^0.8.20;
 
 import { IERC20 } from "../dependencies/openzeppelin/contracts/IERC20.sol";
-
 import { ILendingPoolStorage } from "../interfaces/ILendingPoolStorage.sol";
 import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
 import { Errors } from "../libraries/helpers/Errors.sol";
+import { DataTypes } from "../libraries/types/DataTypes.sol";
+import { InterestCalculator } from "../libraries/helpers/InterestCalculator.sol";
+
 /**
   * @title LendingPoolStorage
   * @notice This contract stores the data related to loans, collateral, and lending tokens. 
   *         It is primarily used by the LendingPool to interact with and manage users' loans and collateral.
 */
-contract LendingPoolStorage is ILendingPoolStorage {
-  
-  /**
-    * @dev Loan struct represents the details of a user's loan.
-    * @param amount The borrowed amount of the lending token
-    * @param collateralAmount The value of collateral provided by the borrower
-    * @param interestRate The interest rate applied to the loan
-    * @param lastUpdated The timestamp of the last update to the loan
-  */
-  struct Loan {
-    uint256 amount;
-    uint256 collateralAmount;
-    uint256 interestRate;
-    uint256 lastUpdated;
+abstract contract LendingPoolStorage is ILendingPoolStorage {
+  using InterestCalculator for DataTypes.Loan;
+
+  struct TokenPrice {
+    address token;  // The address of the token
+    uint256 price;  // The USD price of the token
   }
+
+  uint256 loanId = 0;
 
   // The address of the LendingPool contract
   address public lendingPool;
@@ -42,9 +38,15 @@ contract LendingPoolStorage is ILendingPoolStorage {
   address[] public lendingTokens;
   address[] public collateralTokens;
 
-  // Mappings to store user-specific loan and collateral data
-  mapping(address => mapping(address => Loan)) public loans; // borrower -> token -> Loan data
+  // TODO!: implement debt token for borrowing instead of storing in a map
+  mapping(address => DataTypes.Loan[]) public loans; // borrower -> Loan data
+
+  // TODO!: implement pToken for adding liquidity instead of storing in map
+  mapping(address => DataTypes.LendingPosition) public userLendingPositions; // user -> LendingPosition
+
   mapping(address => mapping(address => uint256)) public userCollateral; // user -> token -> amount
+
+  mapping(address => DataTypes.PoolTokenState) public poolTokenStates; // token -> PoolTokenState
 
   /// @inheritdoc ILendingPoolStorage
   function addCollateralToken(address token) external {
@@ -66,12 +68,44 @@ contract LendingPoolStorage is ILendingPoolStorage {
   function getUserTotalDebt(
     address user
   ) public view override returns (uint256) {
+    DataTypes.Loan[] storage userLoans = loans[user];
     uint256 totalDebt = 0;
-    // Iterate through all lending tokens and sum the user's loan amounts
-    for (uint256 i = 0; i < lendingTokens.length; i++) {
-      address token = lendingTokens[i];
-      totalDebt += loans[user][token].amount;
+
+    uint256 tokenCount = 0;
+    TokenPrice[] memory tokenPrices = new TokenPrice[](userLoans.length);
+
+    uint256 tokenPrice;
+    bool found = false;
+    
+    for (uint256 i = 0; i < userLoans.length; i++) {
+      DataTypes.Loan storage loan = userLoans[i];
+      
+      // Skip loans that have a zero principal (e.g., if they've been repaid or are inactive)
+      if (loan.principalAmount == 0) {
+        continue;
+      }
+
+      // Search for token price in memory array (small lookup overhead)
+      for (uint256 j = 0; j < tokenCount; j++) {
+        if (tokenPrices[j].token == loan.principalToken) {
+          tokenPrice = tokenPrices[j].price;
+          found = true;
+          break;
+        }
+      }
+
+      // Fetch price only once per token
+      if (!found) {
+        tokenPrice = IPriceOracle(priceOracleAddress).getPrice(loan.principalToken);
+        tokenPrices[tokenCount] = TokenPrice(loan.principalToken, tokenPrice);
+        tokenCount++;
+      }
+
+      uint256 accruedInterest = loan.calculateAccruedInterest(getUtilizationRate(loan.principalToken));
+
+      totalDebt += (loan.principalAmount + accruedInterest) * tokenPrice;
     }
+
     return totalDebt;
   }
 
@@ -80,11 +114,13 @@ contract LendingPoolStorage is ILendingPoolStorage {
     address user
   ) public view override returns (uint256) {
     uint256 totalValue = 0;
+
     for (uint256 i = 0; i < collateralTokens.length; i++) {
       address token = collateralTokens[i];
       IPriceOracle priceOracle = IPriceOracle(priceOracleAddress);
       totalValue += priceOracle.getPrice(token) * userCollateral[user][token];
     }
+    
     return totalValue;
   }
 
@@ -100,5 +136,16 @@ contract LendingPoolStorage is ILendingPoolStorage {
     address user
   ) public view override returns (bool) {
     return getUserCollateralValue(user) < getUserTotalDebt(user) * 125 / 100;
+  }
+
+  /// @inheritdoc ILendingPoolStorage
+  function getUtilizationRate(
+    address token
+  ) public view override returns (uint256) {
+    DataTypes.PoolTokenState storage tokenState = poolTokenStates[token];
+
+    uint256 utilizationRate = (tokenState.grossLiquidity - tokenState.availableLiquidity) / tokenState.grossLiquidity;
+
+    return utilizationRate;
   }
 }
