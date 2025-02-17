@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import { IERC20 } from "../dependencies/openzeppelin/contracts/IERC20.sol";
 
 import { ILendingPoolStorage } from "../interfaces/ILendingPoolStorage.sol";
-
+import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
 /**
   * @title LendingPoolStorage
   * @notice This contract stores the data related to loans, collateral, and lending tokens. 
@@ -31,7 +31,7 @@ contract LendingPoolStorage is ILendingPoolStorage {
   // The address of the treasury where collected fees are stored
   address public treasury;
   // The address of the price oracle used to get token prices
-  address public priceOracle;
+  address public priceOracleAddress;
 
   // Mappings to check if a token is accepted as collateral or a lending token
   mapping(address => bool) public isCollateral;
@@ -64,7 +64,7 @@ contract LendingPoolStorage is ILendingPoolStorage {
   /// @inheritdoc ILendingPoolStorage
   function getUserTotalDebt(
     address user
-  ) external view override returns (uint256) {
+  ) public view override returns (uint256) {
     uint256 totalDebt = 0;
     // Iterate through all lending tokens and sum the user's loan amounts
     for (uint256 i = 0; i < lendingTokens.length; i++) {
@@ -72,5 +72,32 @@ contract LendingPoolStorage is ILendingPoolStorage {
       totalDebt += loans[user][token].amount;
     }
     return totalDebt;
+  }
+
+  /// @inheritdoc ILendingPoolStorage
+  function getUserCollateralValue(
+    address user
+  ) public view override returns (uint256) {
+    uint256 totalValue = 0;
+    for (uint256 i = 0; i < collateralTokens.length; i++) {
+      address token = collateralTokens[i];
+      IPriceOracle priceOracle = IPriceOracle(priceOracleAddress);
+      totalValue += priceOracle.getPrice(token) * userCollateral[user][token];
+    }
+    return totalValue;
+  }
+
+  /// @inheritdoc ILendingPoolStorage
+  function getBorrowLimit(
+    address user
+  ) external view override returns (uint256) {
+    return (getUserCollateralValue(user) * 75) / 100; // 75% Loan-to-Value (LTV) ratio
+  }
+
+  /// @inheritdoc ILendingPoolStorage
+  function isLiquidatable(
+    address user
+  ) external view override returns (bool) {
+    return getUserCollateralValue(user) < getUserTotalDebt(user) * 125 / 100;
   }
 }

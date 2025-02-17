@@ -43,6 +43,16 @@ interface ILendingPool {
     uint256 amount
   );
 
+  /// @notice Emitted on withdrawCollateral().
+  /// @param user The address of the user who withdrew the collateral.
+  /// @param token The address of the collateral token that was withdrawn.
+  /// @param amount The amount of collateral that was withdrawn.
+  event CollateralWithdrawn(
+    address indexed user,
+    address indexed token,
+    uint256 amount
+  );
+
   /**
     * @dev Emitted on borrow()
     * @param user The address of the borrower
@@ -112,6 +122,15 @@ interface ILendingPool {
   function depositCollateral(
     address collateral,
     uint256 amount
+  ) external;
+
+  /// @notice Withdraws a specified amount of collateral from the protocol.
+  /// @dev This function allows a user to remove collateral that they've supplied.
+  /// @param collateral The address of the collateral token to withdraw.
+  /// @param amount The amount of collateral to be withdrawn.
+  function withdrawCollateral(
+      address collateral,
+      uint256 amount
   ) external;
 
   /**

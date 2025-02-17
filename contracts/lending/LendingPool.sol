@@ -11,6 +11,7 @@ import { CollateralManager } from  "./CollateralManager.sol";
 import { InterestRateModel } from"./InterestRateModel.sol";
 import { PriceOracle } from "../utils/PriceOracle.sol";
 import { ILendingPool } from "../interfaces/ILendingPool.sol";
+import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
 import { LendingPoolStorage } from "./LendingPoolStorage.sol";
 
 /**
@@ -40,8 +41,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     address _treasury
   ) external initializer {
     interestRateModel = InterestRateModel(_interestRateModel);
-    priceOracle = address(new PriceOracle());
-    collateralManager = new CollateralManager(priceOracle);
+    priceOracleAddress = address(new PriceOracle());
     treasury = _treasury;
   }
 
@@ -82,10 +82,24 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     address collateral,
     uint256 amount
   ) external virtual override nonReentrant {
-    require(isCollateral[collateral], "Invalid collateral");
-    IERC20(collateral).safeTransferFrom(msg.sender, address(collateralManager), amount);
-    collateralManager.deposit(msg.sender, collateral, amount);
+    require(isCollateral[collateral], "Unsupported collateral");
+    IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
+    userCollateral[msg.sender][collateral] += amount;
     emit CollateralDeposited(msg.sender, collateral, amount);
+  }
+
+  /// @inheritdoc ILendingPool
+  function withdrawCollateral(
+    address collateral,
+    uint256 amount
+  ) external virtual override nonReentrant {
+    require(isCollateral[collateral], "Unsupported collateral");
+    IPriceOracle priceOracle = IPriceOracle(priceOracleAddress);
+    uint256 remainingValue = getUserCollateralValue(msg.sender) - priceOracle.getPrice(collateral) * amount;
+    require(remainingValue >= getUserTotalDebt(msg.sender) * 125 / 100, "Collateral below required threshold");
+    userCollateral[msg.sender][collateral] -= amount;
+    IERC20(collateral).transfer(msg.sender, amount); 
+    emit CollateralWithdrawn(msg.sender, collateral, amount);
   }
 
   /// @inheritdoc ILendingPool
@@ -93,7 +107,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
     address token,
     uint256 amount
   ) external virtual override nonReentrant {
-    require(isLendingToken[token], "Invalid lending token");
+    require(isLendingToken[token], "Unsupported lending token");
 
     uint256 maxBorrow = collateralManager.getBorrowLimit(msg.sender);
     require(amount <= maxBorrow, "Exceeds borrowing limit");
@@ -144,6 +158,6 @@ contract LendingPool is ILendingPool, LendingPoolStorage, ReentrancyGuard, Ownab
   }
 
   function getPriceOracleAddress() external view returns (address) {
-    return address(priceOracle);
+    return address(priceOracleAddress);
   }
 }
