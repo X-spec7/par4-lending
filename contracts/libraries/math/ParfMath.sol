@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./Errors.sol";
+import "../helpers/Errors.sol";
 
 /**
  * @title Parf Math Contract
