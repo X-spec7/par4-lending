@@ -2,11 +2,11 @@
 pragma solidity ^0.8.20;
 
 /**
- * @title ILendingPoolStorage
+ * @title IParfStorage
  * @notice Defines the interface for Lending Pool Storage of Par4 protocol.
  */
 
-interface ILendingPoolStorage {
+interface IParfStorage {
     /**
      * @notice Emitted on addLendingToken()
      * @param newLendingToken The address of the new token added as a lending asset.

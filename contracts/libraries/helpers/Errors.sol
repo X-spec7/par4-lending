@@ -65,6 +65,8 @@ library Errors {
     string public constant INVALID_INT256 = "Number exceeds int256 maximum";
 
     /// @notice Thrown when attempting to convert a negative number to an unsigned type.
-    string public constant NEGATIVE_NUMBER =
-        "Cannot convert negative number to unsigned";
+    string public constant NEGATIVE_NUMBER = "Cannot convert negative number to unsigned";
+
+    /// @notice Error message thrown when a reentrant call is detected
+    string public constant REENTRANT_CALL_BLOCKED = "Cannot re-enter function";
 }

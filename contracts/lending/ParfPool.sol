@@ -7,13 +7,14 @@ import {ReentrancyGuard} from "../dependencies/openzeppelin/contracts/Reentrancy
 import {Ownable} from "../dependencies/openzeppelin/contracts/Ownable.sol";
 import {Initializable} from "../dependencies/openzeppelin/proxy/Initializable.sol";
 import {PriceOracle} from "../utils/PriceOracle.sol";
-import {ILendingPool} from "../interfaces/ILendingPool.sol";
+import {ILendingPool} from "../interfaces/IParfPool.sol";
 import {IPriceOracle} from "../interfaces/IPriceOracle.sol";
-import {LendingPoolStorage} from "./LendingPoolStorage.sol";
+import {ParfStorage} from "./ParfStorage.sol";
 import {Errors} from "../libraries/helpers/Errors.sol";
 import {DataTypes} from "../libraries/types/DataTypes.sol";
 import {Helper} from "../libraries/helpers/Helper.sol";
 import {InterestCalculator} from "../libraries/helpers/InterestCalculator.sol";
+import {ParfCore} from "./ParfCore.sol";
 
 /**
  * @title Par4 Lending Pool Contract
@@ -25,12 +26,11 @@ import {InterestCalculator} from "../libraries/helpers/InterestCalculator.sol";
  *   # borrow
  *   # repay
  */
-contract LendingPool is
+contract ParfPool is
     ILendingPool,
-    LendingPoolStorage,
-    ReentrancyGuard,
     Ownable,
-    Initializable
+    Initializable,
+    ParfCore
 {
     using SafeERC20 for IERC20;
     using InterestCalculator for DataTypes.Loan;
@@ -39,6 +39,43 @@ contract LendingPool is
     uint16 public constant FEE_BPS = 39;
     uint16 public constant CASHBACK_BPS = 1500;
     uint16 public constant BPS_DIVISOR = 10000;
+
+    /**
+     * @dev Prevents marked functions from being reentered 
+     * Note: this restrict contracts from calling comet functions in their hooks.
+     * Doing so will cause the transaction to revert.
+     */
+    modifier nonReentrant() {
+        nonReentrantBefore();
+        _;
+        nonReentrantAfter();
+    }
+
+    /**
+     * @dev Checks that the reentrancy flag is not set and then sets the flag
+     */
+    function nonReentrantBefore() internal {
+        bytes32 slot = REENTRANCY_GUARD_FLAG_SLOT;
+        uint256 status;
+        assembly ("memory-safe") {
+            status := sload(slot)
+        }
+
+        if (status == REENTRANCY_GUARD_ENTERED) revert (Errors.REENTRANT_CALL_BLOCKED);
+        assembly ("memory-safe") {
+            sstore(slot, REENTRANCY_GUARD_ENTERED)
+        }
+    }
+
+    /**
+     * @dev Unsets the reentrancy flag
+     */
+    function nonReentrantAfter() internal {
+        bytes32 slot = REENTRANCY_GUARD_FLAG_SLOT;
+        assembly ("memory-safe") {
+            sstore(slot, REENTRANCY_GUARD_NOT_ENTERED)
+        }
+    }
 
     function initialize(address _treasury) external initializer {
         priceOracleAddress = address(new PriceOracle());

@@ -2,18 +2,18 @@
 pragma solidity ^0.8.20;
 
 import {IERC20} from "../dependencies/openzeppelin/contracts/IERC20.sol";
-import {ILendingPoolStorage} from "../interfaces/ILendingPoolStorage.sol";
+import {IParfStorage} from "../interfaces/IParfStorage.sol";
 import {IPriceOracle} from "../interfaces/IPriceOracle.sol";
 import {Errors} from "../libraries/helpers/Errors.sol";
 import {DataTypes} from "../libraries/types/DataTypes.sol";
 import {InterestCalculator} from "../libraries/helpers/InterestCalculator.sol";
 
 /**
- * @title LendingPoolStorage
+ * @title ParfStorage
  * @notice This contract stores the data related to loans, collateral, and lending tokens.
  *         It is primarily used by the LendingPool to interact with and manage users' loans and collateral.
  */
-abstract contract LendingPoolStorage is ILendingPoolStorage {
+abstract contract ParfStorage is IParfStorage {
     using InterestCalculator for DataTypes.Loan;
 
     struct TokenPrice {
@@ -38,7 +38,6 @@ abstract contract LendingPoolStorage is ILendingPoolStorage {
     address[] public lendingTokens;
     address[] public collateralTokens;
 
-    // TODO!: implement debt token for borrowing instead of storing in a map
     mapping(address => DataTypes.Loan[]) public loans; // borrower -> Loan data
 
     // TODO!: implement pToken for adding liquidity instead of storing in map
@@ -48,7 +47,7 @@ abstract contract LendingPoolStorage is ILendingPoolStorage {
 
     mapping(address => DataTypes.PoolTokenState) public poolTokenStates; // token -> PoolTokenState
 
-    /// @inheritdoc ILendingPoolStorage
+    /// @inheritdoc IParfStorage
     function addCollateralToken(address token) external {
         require(!isCollateral[token], Errors.COLLATERAL_ALREADY_ADDED);
         isCollateral[token] = true;
@@ -56,7 +55,7 @@ abstract contract LendingPoolStorage is ILendingPoolStorage {
         emit LendingTokenAdded(token);
     }
 
-    /// @inheritdoc ILendingPoolStorage
+    /// @inheritdoc IParfStorage
     function addLendingToken(address token) external {
         require(!isLendingToken[token], Errors.LENDING_TOKEN_ALREADY_ADDED);
         isLendingToken[token] = true;
@@ -64,7 +63,7 @@ abstract contract LendingPoolStorage is ILendingPoolStorage {
         emit CollateralTokenAdded(token);
     }
 
-    /// @inheritdoc ILendingPoolStorage
+    /// @inheritdoc IParfStorage
     function getUserTotalDebt(
         address user
     ) public view override returns (uint256) {
@@ -116,7 +115,7 @@ abstract contract LendingPoolStorage is ILendingPoolStorage {
         return totalDebt;
     }
 
-    /// @inheritdoc ILendingPoolStorage
+    /// @inheritdoc IParfStorage
     function getUserCollateralValue(
         address user
     ) public view override returns (uint256) {
@@ -133,20 +132,20 @@ abstract contract LendingPoolStorage is ILendingPoolStorage {
         return totalValue;
     }
 
-    /// @inheritdoc ILendingPoolStorage
+    /// @inheritdoc IParfStorage
     function getBorrowLimit(
         address user
     ) public view override returns (uint256) {
         return (getUserCollateralValue(user) * 75) / 100; // 75% Loan-to-Value (LTV) ratio
     }
 
-    /// @inheritdoc ILendingPoolStorage
+    /// @inheritdoc IParfStorage
     function isLiquidatable(address user) public view override returns (bool) {
         return
             getUserCollateralValue(user) < (getUserTotalDebt(user) * 125) / 100;
     }
 
-    /// @inheritdoc ILendingPoolStorage
+    /// @inheritdoc IParfStorage
     function getUtilizationRate(
         address token
     ) public view override returns (uint256) {
