@@ -87,27 +87,27 @@ contract ParfPool is
         address asset,
         uint256 amount
     ) external virtual override nonReentrant {
-        require(isLendingToken[asset], Errors.UNSUPPORTED_LENDING_TOKEN);
+        // require(isLendingToken[asset], Errors.UNSUPPORTED_LENDING_TOKEN);
 
-        // Transfer the asset from the user to the lending pool
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        // // Transfer the asset from the user to the lending pool
+        // IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
 
-        // Update pool token state
-        DataTypes.PoolTokenState storage tokenState = poolTokenStates[asset];
-        tokenState.grossLiquidity += amount;
-        tokenState.availableLiquidity += amount;
+        // // Update pool token state
+        // DataTypes.PoolTokenState storage tokenState = poolTokenStates[asset];
+        // tokenState.grossLiquidity += amount;
+        // tokenState.availableLiquidity += amount;
 
-        // Update user lending position
-        DataTypes.LendingPosition storage position = userLendingPositions[
-            msg.sender
-        ];
-        if (position.amount == 0) {
-            position.lender = msg.sender;
-            position.lendingToken = asset;
-            position.depositTimestamp = block.timestamp;
-        }
-        position.amount += amount;
-        position.lastActionTimestamp = block.timestamp;
+        // // Update user lending position
+        // DataTypes.LendingPosition storage position = userLendingPositions[
+        //     msg.sender
+        // ];
+        // if (position.amount == 0) {
+        //     position.lender = msg.sender;
+        //     position.lendingToken = asset;
+        //     position.depositTimestamp = block.timestamp;
+        // }
+        // position.amount += amount;
+        // position.lastActionTimestamp = block.timestamp;
 
         // Emit event that asset has been supplied
         emit AssetSupplied(msg.sender, asset, amount);
@@ -142,7 +142,7 @@ contract ParfPool is
         require(isCollateral[collateral], Errors.UNSUPPORTED_COLLATERAL);
 
         IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
-        userCollateral[msg.sender][collateral] += amount;
+        userCollaterals[msg.sender][collateral] += amount;
 
         emit CollateralDeposited(msg.sender, collateral, amount);
     }
@@ -165,7 +165,7 @@ contract ParfPool is
 
         uint256 fee = (amount * FEE_BPS) / BPS_DIVISOR;
 
-        userCollateral[msg.sender][collateral] -= amount;
+        userCollaterals[msg.sender][collateral] -= amount;
         IERC20(collateral).safeTransfer(msg.sender, amount - fee);
         IERC20(collateral).safeTransfer(treasury, fee);
 
@@ -281,7 +281,7 @@ contract ParfPool is
 
         for (uint256 i = 0; i < collateralTokens.length; i++) {
             address collateralToken = collateralTokens[i];
-            if (userCollateral[user][collateralToken] != 0) {
+            if (userCollaterals[user][collateralToken] != 0) {
                 _liquidateCollateral(user, collateralToken, 0);
             }
         }
@@ -307,10 +307,10 @@ contract ParfPool is
 
         if (amount == 0) {
             // TODO!: Implement detailed liquidation logic here with the entire collateral balance.
-            userCollateral[user][collateral] = 0;
+            userCollaterals[user][collateral] = 0;
         } else {
             // TODO!: Implement detailed liquidation logic here with the amount of the collateral
-            userCollateral[user][collateral] -= amount;
+            userCollaterals[user][collateral] -= amount;
         }
     }
 

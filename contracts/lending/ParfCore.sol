@@ -7,6 +7,10 @@ abstract contract ParfCore is ParfStorage {
     /// @dev The storage slot for storing reentrancy guard flag
     bytes32 internal constant REENTRANCY_GUARD_FLAG_SLOT =
         bytes32(keccak256("parf.reentrancy.guard"));
+    
+    /// @dev The storage slot for storing treasury address
+    bytes32 internal constant TREASURY_ADDRESS_SLOT =
+        bytes32(keccak256("parf.treasure.address"));
 
     /// @dev Reentrancy guard flag statuses
     /// @dev The value `0` indicates that the function has **not** been entered yet. This is the default initial value of the storage slot.
