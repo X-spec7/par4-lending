@@ -8,18 +8,11 @@ pragma solidity ^0.8.20;
  */
 library Errors {
     /// @notice Thrown when the caller is not authorized to perform an action.
-    string public constant CALLER_NOT_ADMIN = "Caller is not an admin";
-
-    /// @notice Thrown when attempting to add a collateral token that already exists.
-    string public constant COLLATERAL_ALREADY_ADDED =
-        "Collateral already added";
-
-    /// @notice Thrown when attempting to add a lending token that already exists.
-    string public constant LENDING_TOKEN_ALREADY_ADDED =
-        "Lending token already added";
+    string public constant CALLER_NOT_ADMIN =
+        "Caller is not an admin";
 
     /// @notice Thrown when the provided lending token is not supported by the protocol.
-    string public constant UNSUPPORTED_LENDING_TOKEN =
+    string public constant UNSUPPORTED_BASE_TOKEN =
         "Unsupported lending token";
 
     /// @notice Thrown when the provided collateral token is not supported by the protocol.
@@ -35,7 +28,8 @@ library Errors {
         "Borrow amount exceeds limit";
 
     /// @notice Thrown when a user attempts to perform an operation on a non-existent loan.
-    string public constant NO_ACTIVE_LOAN = "No active loan found";
+    string public constant NO_ACTIVE_LOAN =
+        "No active loan found";
 
     /// @notice Thrown when a position is not eligible for liquidation due to LTV not exceeding the threshold.
     string public constant NOT_LIQUIDATABLE =
@@ -49,24 +43,32 @@ library Errors {
     string public constant INSUFFICIENT_REPAYMENT =
         "Repayment amount is insufficient";
 
+    /// @notice Error message thrown when a reentrant call is detected
+    string public constant REENTRANT_CALL_BLOCKED =
+        "Cannot re-enter function";
+
+    /// @notice Math Related Errors
     /// @notice Thrown when a number exceeds the maximum value of uint64.
-    string public constant INVALID_UINT64 = "Number exceeds uint64 maximum";
+    string public constant INVALID_UINT64 =
+        "Number exceeds uint64 maximum";
 
     /// @notice Thrown when a number exceeds the maximum value of uint104.
-    string public constant INVALID_UINT104 = "Number exceeds uint104 maximum";
+    string public constant INVALID_UINT104 =
+        "Number exceeds uint104 maximum";
 
     /// @notice Thrown when a number exceeds the maximum value of uint128.
-    string public constant INVALID_UINT128 = "Number exceeds uint128 maximum";
+    string public constant INVALID_UINT128 =
+        "Number exceeds uint128 maximum";
 
     /// @notice Thrown when a number exceeds the maximum value of int104.
-    string public constant INVALID_INT104 = "Number exceeds int104 maximum";
+    string public constant INVALID_INT104 =
+        "Number exceeds int104 maximum";
 
     /// @notice Thrown when a number exceeds the maximum value of int256.
-    string public constant INVALID_INT256 = "Number exceeds int256 maximum";
+    string public constant INVALID_INT256 =
+        "Number exceeds int256 maximum";
 
     /// @notice Thrown when attempting to convert a negative number to an unsigned type.
-    string public constant NEGATIVE_NUMBER = "Cannot convert negative number to unsigned";
-
-    /// @notice Error message thrown when a reentrant call is detected
-    string public constant REENTRANT_CALL_BLOCKED = "Cannot re-enter function";
+    string public constant NEGATIVE_NUMBER =
+        "Cannot convert negative number to unsigned";
 }

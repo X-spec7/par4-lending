@@ -21,17 +21,10 @@ library DataTypes {
         uint256 lastPaymentTimestamp; // Timestamp of the most recent payment
     }
 
-    struct PoolTokenState {
-        address token; // The lending token address
-        uint256 grossLiquidity; // Total amount of tokens deposited into the pool
-        uint256 availableLiquidity; // Amount available for new loans (after deducting outstanding loans)
-    }
-
     /// @dev Store whether a certain collateral is used, a certain base asset is deposited, or borrowed
     struct UserBasic {
+        uint104 principal;
         uint16 assetsIn;
-        uint16 baseAssetsIn;
-        uint16 baseAssetsOut;
     }
 
     struct TokenPrice {
