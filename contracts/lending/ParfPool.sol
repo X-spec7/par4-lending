@@ -40,46 +40,9 @@ contract ParfPool is
     uint16 public constant CASHBACK_BPS = 1500;
     uint16 public constant BPS_DIVISOR = 10000;
 
-    /**
-     * @dev Prevents marked functions from being reentered 
-     * Note: this restrict contracts from calling comet functions in their hooks.
-     * Doing so will cause the transaction to revert.
-     */
-    modifier nonReentrant() {
-        nonReentrantBefore();
-        _;
-        nonReentrantAfter();
-    }
-
-    /**
-     * @dev Checks that the reentrancy flag is not set and then sets the flag
-     */
-    function nonReentrantBefore() internal {
-        bytes32 slot = REENTRANCY_GUARD_FLAG_SLOT;
-        uint256 status;
-        assembly ("memory-safe") {
-            status := sload(slot)
-        }
-
-        if (status == REENTRANCY_GUARD_ENTERED) revert (Errors.REENTRANT_CALL_BLOCKED);
-        assembly ("memory-safe") {
-            sstore(slot, REENTRANCY_GUARD_ENTERED)
-        }
-    }
-
-    /**
-     * @dev Unsets the reentrancy flag
-     */
-    function nonReentrantAfter() internal {
-        bytes32 slot = REENTRANCY_GUARD_FLAG_SLOT;
-        assembly ("memory-safe") {
-            sstore(slot, REENTRANCY_GUARD_NOT_ENTERED)
-        }
-    }
-
     function initialize(address _treasury) external initializer {
         priceOracleAddress = address(new PriceOracle());
-        treasury = _treasury;
+        // treasury = _treasury;
     }
 
     /// @inheritdoc ILendingPool
@@ -87,27 +50,27 @@ contract ParfPool is
         address asset,
         uint256 amount
     ) external virtual override nonReentrant {
-        require(isLendingToken[asset], Errors.UNSUPPORTED_LENDING_TOKEN);
+        // require(isLendingToken[asset], Errors.UNSUPPORTED_BASE_TOKEN);
 
-        // Transfer the asset from the user to the lending pool
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        // // Transfer the asset from the user to the lending pool
+        // IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
 
-        // Update pool token state
-        DataTypes.PoolTokenState storage tokenState = poolTokenStates[asset];
-        tokenState.grossLiquidity += amount;
-        tokenState.availableLiquidity += amount;
+        // // Update pool token state
+        // DataTypes.PoolTokenState storage tokenState = poolTokenStates[asset];
+        // tokenState.grossLiquidity += amount;
+        // tokenState.availableLiquidity += amount;
 
-        // Update user lending position
-        DataTypes.LendingPosition storage position = userLendingPositions[
-            msg.sender
-        ];
-        if (position.amount == 0) {
-            position.lender = msg.sender;
-            position.lendingToken = asset;
-            position.depositTimestamp = block.timestamp;
-        }
-        position.amount += amount;
-        position.lastActionTimestamp = block.timestamp;
+        // // Update user lending position
+        // DataTypes.LendingPosition storage position = userLendingPositions[
+        //     msg.sender
+        // ];
+        // if (position.amount == 0) {
+        //     position.lender = msg.sender;
+        //     position.lendingToken = asset;
+        //     position.depositTimestamp = block.timestamp;
+        // }
+        // position.amount += amount;
+        // position.lastActionTimestamp = block.timestamp;
 
         // Emit event that asset has been supplied
         emit AssetSupplied(msg.sender, asset, amount);
@@ -118,7 +81,7 @@ contract ParfPool is
         address asset,
         uint256 amount
     ) external virtual override nonReentrant {
-        require(isLendingToken[asset], Errors.UNSUPPORTED_LENDING_TOKEN);
+        // require(isLendingToken[asset], Errors.UNSUPPORTED_BASE_TOKEN);
 
         // Check if the user has enough balance to withdraw
         uint256 lenderBalance = IERC20(asset).balanceOf(address(this));
@@ -127,8 +90,8 @@ contract ParfPool is
         uint256 fee = amount * FEE_BPS;
 
         // Transfer the specified amount back to the lender, fee to treasury address
-        IERC20(asset).safeTransfer(msg.sender, amount - fee);
-        IERC20(asset).safeTransfer(treasury, fee);
+        // IERC20(asset).safeTransfer(msg.sender, amount - fee);
+        // IERC20(asset).safeTransfer(treasury, fee);
 
         // Emit event that the asset has been withdrawn by the lender
         emit AssetWithdrawn(msg.sender, asset, amount);
@@ -142,7 +105,7 @@ contract ParfPool is
         require(isCollateral[collateral], Errors.UNSUPPORTED_COLLATERAL);
 
         IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
-        userCollateral[msg.sender][collateral] += amount;
+        userCollaterals[msg.sender][collateral] += amount;
 
         emit CollateralDeposited(msg.sender, collateral, amount);
     }
@@ -165,9 +128,9 @@ contract ParfPool is
 
         uint256 fee = (amount * FEE_BPS) / BPS_DIVISOR;
 
-        userCollateral[msg.sender][collateral] -= amount;
+        userCollaterals[msg.sender][collateral] -= amount;
         IERC20(collateral).safeTransfer(msg.sender, amount - fee);
-        IERC20(collateral).safeTransfer(treasury, fee);
+        // IERC20(collateral).safeTransfer(treasury, fee);
 
         emit CollateralWithdrawn(msg.sender, collateral, amount);
     }
@@ -178,19 +141,19 @@ contract ParfPool is
         uint256 amount,
         DataTypes.LoanTerm selectedTerm
     ) external virtual override nonReentrant {
-        require(isLendingToken[token], Errors.UNSUPPORTED_LENDING_TOKEN);
+        // require(isLendingToken[token], Errors.UNSUPPORTED_BASE_TOKEN);
 
         uint256 maxBorrow = getBorrowLimit(msg.sender);
         require(amount <= maxBorrow, Errors.EXCEED_BORROWING_LIMIT);
 
-        DataTypes.PoolTokenState storage tokenState = poolTokenStates[token];
-        require(
-            amount <= tokenState.availableLiquidity,
-            Errors.INSUFFICIENT_LIQUIDITY
-        );
+        // DataTypes.PoolTokenState storage tokenState = poolTokenStates[token];
+        // require(
+        //     amount <= tokenState.availableLiquidity,
+        //     Errors.INSUFFICIENT_LIQUIDITY
+        // );
 
         // Update pool state
-        tokenState.availableLiquidity -= amount;
+        // tokenState.availableLiquidity -= amount;
 
         // Record the loan
         loans[msg.sender].push(
@@ -235,8 +198,10 @@ contract ParfPool is
                 // Calculate interest accrued since last payment
                 DataTypes.Loan storage selectedLoan = userLoans[i];
 
+                uint256 utilizationRate = getUtilizationRate();
+
                 netInterest = selectedLoan.calculateAccruedInterest(
-                    getUtilizationRate(selectedLoan.principalToken)
+                    utilizationRate
                 );
                 cashback = (netInterest * CASHBACK_BPS) / BPS_DIVISOR;
                 pureInterest = netInterest - cashback;
@@ -251,17 +216,17 @@ contract ParfPool is
                     address(this),
                     selectedLoan.principalAmount
                 );
-                IERC20(token).safeTransferFrom(
-                    msg.sender,
-                    treasury,
-                    pureInterest
-                );
+                // IERC20(token).safeTransferFrom(
+                //     msg.sender,
+                //     treasury,
+                //     pureInterest
+                // );
 
-                // Update pool state
-                DataTypes.PoolTokenState storage tokenState = poolTokenStates[
-                    token
-                ];
-                tokenState.availableLiquidity += selectedLoan.principalAmount;
+                // // Update pool state
+                // DataTypes.PoolTokenState storage tokenState = poolTokenStates[
+                //     token
+                // ];
+                // tokenState.availableLiquidity += selectedLoan.principalAmount;
 
                 // Remove the loan
                 userLoans[loanIndex] = userLoans[userLoans.length - 1]; // Swap with last element
@@ -281,7 +246,7 @@ contract ParfPool is
 
         for (uint256 i = 0; i < collateralTokens.length; i++) {
             address collateralToken = collateralTokens[i];
-            if (userCollateral[user][collateralToken] != 0) {
+            if (userCollaterals[user][collateralToken] != 0) {
                 _liquidateCollateral(user, collateralToken, 0);
             }
         }
@@ -307,10 +272,10 @@ contract ParfPool is
 
         if (amount == 0) {
             // TODO!: Implement detailed liquidation logic here with the entire collateral balance.
-            userCollateral[user][collateral] = 0;
+            userCollaterals[user][collateral] = 0;
         } else {
             // TODO!: Implement detailed liquidation logic here with the amount of the collateral
-            userCollateral[user][collateral] -= amount;
+            userCollaterals[user][collateral] -= amount;
         }
     }
 

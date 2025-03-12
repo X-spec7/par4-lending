@@ -21,18 +21,14 @@ library DataTypes {
         uint256 lastPaymentTimestamp; // Timestamp of the most recent payment
     }
 
-    // TODO: use position index to calculate yield instead of using timestamp
-    struct LendingPosition {
-        address lender; // Address of the lender
-        address lendingToken; // The token being lent into the pool
-        uint256 amount; // The amount of tokens lent
-        uint256 depositTimestamp; // Timestamp when the tokens were deposited
-        uint256 lastActionTimestamp; // Timestamp for the last action on this position
+    /// @dev Store whether a certain collateral is used, a certain base asset is deposited, or borrowed
+    struct UserBasic {
+        uint104 principal;
+        uint16 assetsIn;
     }
 
-    struct PoolTokenState {
-        address token; // The lending token address
-        uint256 grossLiquidity; // Total amount of tokens deposited into the pool
-        uint256 availableLiquidity; // Amount available for new loans (after deducting outstanding loans)
+    struct TokenPrice {
+        address token; // The address of the token
+        uint256 price; // The USD price of the token
     }
 }
