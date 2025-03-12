@@ -16,34 +16,66 @@ import {InterestCalculator} from "../libraries/helpers/InterestCalculator.sol";
 abstract contract ParfStorage is IParfStorage {
     using InterestCalculator for DataTypes.Loan;
 
-    struct TokenPrice {
-        address token; // The address of the token
-        uint256 price; // The USD price of the token
-    }
-
+    /// @dev Tracking the loan id, increased everytime new loan is added
     uint256 loanId = 0;
 
-    // The address of the LendingPool contract
+    /// @dev The address of the LendingPool contract
     address public lendingPool;
-    // The address of the treasury where collected fees are stored
+    /// @dev The address of the treasury where collected fees are stored
     address public treasury;
-    // The address of the price oracle used to get token prices
+    /// @dev The address of the price oracle used to get token prices
     address public priceOracleAddress;
 
-    // Mappings to check if a token is accepted as collateral or a lending token
+    /// @dev The addresses of the assets
+    address immutable usdcAddress;
+    address immutable usdtAddress;
+    address immutable daiAddress;
+    address immutable wETHAddress;
+    address immutable wBTCAddress;
+
+    /// @dev Aggregate variables tracked for the entire market
+    /// @dev Indexes accrued interests since the begining of the pool
+    /// @dev tracking for total supplying and borrowing of base tokens
+    uint40 internal usdcLastAccrualTime;
+    uint40 internal usdtLastAccrualTime;
+    uint40 internal daiLastAccrualTime;
+
+    uint64 internal usdcBaseSupplyIndex;
+    uint64 internal usdcBaseBorrowIndex;
+    uint64 internal usdtBaseBorrowIndex;
+    uint64 internal usdtBaseSupplyIndex;
+    uint64 internal daiBaseSupplyIndex;
+    uint64 internal daiBaseBorrowIndex;
+
+    uint104 internal usdcSupplyBase;
+    uint104 internal usdcBorrowBase;
+    uint104 internal usdtSupplyBase;
+    uint104 internal usdtBorrowBase;
+    uint104 internal daiSupplyBase;
+    uint104 internal daiBorrowBase;
+
+    // TODO: remove these and migrate checking collateral and base token logic to getting setting
+    /// @dev Mappings to check if a token is accepted as collateral or a lending token
     mapping(address => bool) public isCollateral;
     mapping(address => bool) public isLendingToken;
 
+    /// @dev Mappings for total supplied amount for each collateral
+    mapping(address => uint128) public totalCollateralAmount;
+
+    // TODO: remove these
     // Arrays to store the lists of collateral and lending tokens
     address[] public lendingTokens;
     address[] public collateralTokens;
 
     mapping(address => DataTypes.Loan[]) public loans; // borrower -> Loan data
 
-    // TODO!: implement pToken for adding liquidity instead of storing in map
-    mapping(address => DataTypes.LendingPosition) public userLendingPositions; // user -> LendingPosition
+    /// @dev lending and borrowing principal values
+    mapping(address => mapping(address => uint104))
+        public userLendingPrincipals; // user -> token -> principal lending value
+    mapping(address => mapping(address => uint104))
+        public userBorrowingPrincipals; // user -> token -> principal borrowing value
 
-    mapping(address => mapping(address => uint256)) public userCollateral; // user -> token -> amount
+    mapping(address => mapping(address => uint256)) public userCollaterals; // user -> token -> amount
 
     mapping(address => DataTypes.PoolTokenState) public poolTokenStates; // token -> PoolTokenState
 
@@ -71,7 +103,9 @@ abstract contract ParfStorage is IParfStorage {
         uint256 totalDebt = 0;
 
         uint256 tokenCount = 0;
-        TokenPrice[] memory tokenPrices = new TokenPrice[](userLoans.length);
+        DataTypes.TokenPrice[] memory tokenPrices = new DataTypes.TokenPrice[](
+            userLoans.length
+        );
 
         uint256 tokenPrice;
         bool found = false;
@@ -98,7 +132,7 @@ abstract contract ParfStorage is IParfStorage {
                 tokenPrice = IPriceOracle(priceOracleAddress).getPrice(
                     loan.principalToken
                 );
-                tokenPrices[tokenCount] = TokenPrice(
+                tokenPrices[tokenCount] = DataTypes.TokenPrice(
                     loan.principalToken,
                     tokenPrice
                 );
@@ -126,7 +160,7 @@ abstract contract ParfStorage is IParfStorage {
             IPriceOracle priceOracle = IPriceOracle(priceOracleAddress);
             totalValue +=
                 priceOracle.getPrice(token) *
-                userCollateral[user][token];
+                userCollaterals[user][token];
         }
 
         return totalValue;
